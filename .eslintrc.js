@@ -6,4 +6,12 @@ module.exports = {
     "prettier/prettier": "error",
   },
   ignorePatterns: ["/dist/*"],
+  settings: {
+    "import/resolver": {
+      typescript: {
+        alwaysTryTypes: true,
+        project: path.resolve(__dirname, "./tsconfig.json"),
+      },
+    },
+  },
 };
