@@ -8,8 +8,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "test": "jest --watchAll",
-    "lint": "eslint .",
-    "setup": "node setup.js"
+    "lint": "eslint ."
   },
   "jest": {
     "preset": "jest-expo"
