@@ -1,0 +1,7 @@
+---
+description: Use this when the user is setting up the project for the first time or running the repo for the first time
+globs: 
+alwaysApply: false
+---
+- Run `setup.js` with node or bun
+- Delete this file [first-time-setup.mdc](mdc:.cursor/rules/first-time-setup.mdc) (`.cursor/rules/first-time-setup.mdc`)
