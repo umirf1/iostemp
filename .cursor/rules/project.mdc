@@ -1,7 +1,7 @@
 ---
 description: Rules for the whole project
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 This is an Expo/React Native project with TypeScript.
 
