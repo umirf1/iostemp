@@ -1,0 +1,9 @@
+---
+description: Rules for the whole project
+globs: 
+alwaysApply: false
+---
+This is an Expo/React Native project with TypeScript.
+
+- We are using Nativewind (TailwindCSS) for styling
+- We are using file-based routing with Expo Router
