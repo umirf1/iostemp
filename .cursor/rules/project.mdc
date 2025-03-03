@@ -6,4 +6,7 @@ alwaysApply: false
 This is an Expo/React Native project with TypeScript.
 
 - We are using Nativewind (TailwindCSS) for styling
-- We are using file-based routing with Expo Router
+- We are using file-based routing with Expo Router. The root layout is [_layout.tsx](mdc:src/app/_layout.tsx)
+- All the screens are defined in `./src/app/**`
+- All the components are defined in `./src/components/**`
+- All other TypeScript files are in `./src/lib/**`
