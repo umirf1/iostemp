@@ -1,14 +1,51 @@
-# Mobile Template 1
+# FitcheckAI
 
-> This template is brought to you by [Software Composer](https://softwarecomposer.com).
+> This mobile app was created using a template from [Software Composer](https://softwarecomposer.com).
 
-Use this template to quickly create a new mobile app.
+FitcheckAI is a mobile application that helps users with their fashion choices by providing AI-powered outfit analysis and ratings.
 
-## Get started
+## 📖 Documentation
 
-1. Clone the repo by clicking the "Use this template" button above.
-2. Copy the Github link and paste into Cursor, Windsurf, Bolt, or your favorite AI vibe coding tool.
-3. Ask the AI agent to "Setup the project" and it will guide you through the setup process.
-4. Ask the AI agent to "Run the project" and it will guide you through the run the project on a simulator or device.
+For detailed information about the app's features, flow, and technical specifications, please refer to the [App Documentation](docs/app-documentation.md).
+
+## Getting Started
+
+### Prerequisites
+- [Node.js](https://nodejs.org/)
+- [Bun](https://bun.sh/) - Fast JavaScript runtime and package manager
+- [Expo CLI](https://docs.expo.dev/get-started/installation/)
+- iOS Simulator (for Mac users) or Android Emulator
+
+### Installation
+
+1. Install dependencies:
+```bash
+bun install
+```
+
+### Running the Project
+
+To start the development server:
+```bash
+bun start
+```
+
+To run on iOS (requires macOS and Xcode):
+```bash
+bun ios
+```
+
+To run on Android (requires Android Studio):
+```bash
+bun android
+```
+
+## Project Structure
+
+This project is built with Expo and React Native, using:
+- TypeScript for type safety
+- NativeWind for styling
+- Expo Router for navigation
+- Drizzle ORM for database operations
 
 

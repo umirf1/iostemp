@@ -70,6 +70,27 @@ function RootLayoutNav() {
               sheetAllowedDetents: [0.3, 1.0],
             }}
           />
+          <Stack.Screen 
+            name="camera" 
+            options={{ 
+              headerShown: false,
+              presentation: "fullScreenModal"
+            }} 
+          />
+          <Stack.Screen 
+            name="analysis" 
+            options={{ 
+              headerShown: false,
+              animation: "fade"
+            }} 
+          />
+          <Stack.Screen 
+            name="results" 
+            options={{ 
+              headerShown: false,
+              animation: "fade"
+            }} 
+          />
         </Stack>
       </MigrationProvider>
     </ThemeProvider>
