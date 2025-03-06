@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
-import { StyleSheet, TouchableOpacity, Image, ScrollView, View, Animated, Platform } from "react-native";
+import { StyleSheet, TouchableOpacity, Image, ScrollView, View, Animated, Platform, Easing } from "react-native";
 import { Text } from "@/components/Themed";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { router, useLocalSearchParams } from "expo-router";
@@ -50,7 +50,15 @@ export default function HomeScreen() {
   const [selectedCategory, setSelectedCategory] = useState<string>('casual');
   const [selectedGender, setSelectedGender] = useState<string>('neutral');
   const [streakCount, setStreakCount] = useState<number>(3); // Default streak count
+  const [streakDays, setStreakDays] = useState<Date[]>([]);
+  const [loadingOutfit, setLoadingOutfit] = useState<{
+    id: string;
+    imageUri: string;
+    progress: number;
+  } | null>(null);
   const stepsAnimatedValues = useRef(STEPS.map(() => new Animated.Value(0))).current;
+  const spinAnimation = useRef(new Animated.Value(0)).current;
+  const spinningAnimation = useRef<Animated.CompositeAnimation | null>(null);
   
   // Check for captured image from camera
   useEffect(() => {
@@ -60,6 +68,54 @@ export default function HomeScreen() {
       setSelectionModalVisible(true);
     }
   }, [params.capturedImage]);
+
+  // Initialize streak days on component mount
+  useEffect(() => {
+    // For demo purposes, creating last 3 days of streak
+    const today = new Date();
+    const streak = [];
+    for (let i = 0; i < streakCount; i++) {
+      const date = new Date();
+      date.setDate(today.getDate() - i);
+      streak.unshift(date);
+    }
+    setStreakDays(streak);
+  }, []);
+
+  // Helper function to format day label
+  const formatDayLabel = (date: Date) => {
+    const today = new Date();
+    
+    if (date.toDateString() === today.toDateString()) return 'Today';
+    return date.toLocaleDateString('en-US', { weekday: 'short' });
+  };
+
+  // Get the last 7 days for display
+  const getLastSevenDays = () => {
+    const dates = [];
+    const today = new Date();
+    
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(today.getDate() - i);
+      dates.push(date);
+    }
+    return dates;
+  };
+
+  const lastSevenDays = getLastSevenDays();
+
+  // Helper function to check if a date is in the streak
+  const isDateInStreak = (date: Date) => {
+    return streakDays.some(streakDate => 
+      streakDate.toDateString() === date.toDateString()
+    );
+  };
+
+  // Helper function to check if date is today
+  const isToday = (date: Date) => {
+    return date.toDateString() === new Date().toDateString();
+  };
 
   // Animate steps sequentially
   useEffect(() => {
@@ -75,6 +131,23 @@ export default function HomeScreen() {
     Animated.sequence(animations).start();
   }, []);
 
+  // Add spinning animation
+  useEffect(() => {
+    if (loadingOutfit) {
+      // Reset the animation value
+      spinAnimation.setValue(0);
+      // Create and start the looping animation
+      Animated.loop(
+        Animated.timing(spinAnimation, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+          easing: Easing.linear,
+        })
+      ).start();
+    }
+  }, [loadingOutfit]); // Depend on loadingOutfit to restart animation when it changes
+
   const handleCameraPress = () => {
     router.push("/camera" as any);
   };
@@ -88,7 +161,36 @@ export default function HomeScreen() {
     setSelectedCategory(category);
     setSelectedGender(gender);
     setSelectionModalVisible(false);
-    setLoadingVisible(true);
+    
+    // Create a temporary loading outfit entry
+    const loadingId = Date.now().toString();
+    setLoadingOutfit({
+      id: loadingId,
+      imageUri: lastCapturedImage || '',
+      progress: 24
+    });
+
+    // Simulate progress updates with slower timing
+    const progressIntervals = [
+      { progress: 45, delay: 2000 },
+      { progress: 75, delay: 4000 },
+      { progress: 89, delay: 6000 },
+      { progress: 99, delay: 8000 }
+    ];
+
+    progressIntervals.forEach(({ progress, delay }) => {
+      setTimeout(() => {
+        setLoadingOutfit(current => 
+          current ? { ...current, progress } : null
+        );
+      }, delay);
+    });
+
+    // Simulate analysis completion
+    setTimeout(() => {
+      handleAnalysisComplete(85);
+      setLoadingOutfit(null);
+    }, 10000);
   };
 
   const handleAnalysisComplete = (score: number) => {
@@ -111,7 +213,7 @@ export default function HomeScreen() {
   };
 
   // Mock data for streak and recent outfits
-  const weekDays = ["M", "T", "W", "T", "F", "S", "S"];
+  const weekDays = ["M", "T", "W", "Th", "F", "Sa", "Su"];
   const currentDay = 2; // Wednesday (0-indexed)
   
   // Helper function to get relative time
@@ -184,23 +286,23 @@ export default function HomeScreen() {
       {/* Calendar Week View */}
       <View style={styles.calendarContainer}>
         <View style={styles.weekDays}>
-          {weekDays.map((day, index) => {
-            const isCompleted = index < currentDay;
-            const isCurrent = index === currentDay;
+          {lastSevenDays.map((date) => {
+            const inStreak = isDateInStreak(date);
+            const isCurrentDay = isToday(date);
             return (
               <View
-                key={day}
+                key={date.toISOString()}
                 style={[
                   styles.dayCircle,
-                  isCompleted && styles.completedDay,
-                  isCurrent && styles.currentDay
+                  inStreak && styles.completedDay,
+                  isCurrentDay && styles.currentDay
                 ]}
               >
                 <Text style={[
                   styles.dayText,
-                  (isCompleted || isCurrent) && { color: '#000000' }
+                  (inStreak || isCurrentDay) && { color: '#000000' }
                 ]}>
-                  {day}
+                  {formatDayLabel(date)}
                 </Text>
               </View>
             );
@@ -220,7 +322,7 @@ export default function HomeScreen() {
       <View style={styles.recentSection}>
         <Text style={styles.sectionTitle}>Recently logged</Text>
         
-        {outfits.length === 0 ? (
+        {outfits.length === 0 && !loadingOutfit ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateText}>
               No outfits yet. Take a photo to get started!
@@ -228,6 +330,34 @@ export default function HomeScreen() {
           </View>
         ) : (
           <View>
+            {loadingOutfit && (
+              <View style={styles.recentOutfitCard}>
+                <View style={styles.loadingImageContainer}>
+                  <Image source={{ uri: loadingOutfit.imageUri }} style={styles.recentOutfitImage} />
+                  <View style={styles.loadingOverlay}>
+                    <View style={styles.loadingCircle}>
+                      <Animated.View style={[
+                        styles.loadingSpinner,
+                        {
+                          transform: [{
+                            rotate: spinAnimation.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: ['0deg', '360deg']
+                            })
+                          }]
+                        }
+                      ]} />
+                      <Text style={styles.loadingPercentage}>{loadingOutfit.progress}%</Text>
+                    </View>
+                  </View>
+                </View>
+                <View style={styles.recentOutfitInfo}>
+                  <Text style={styles.loadingTitle}>Finalizing results...</Text>
+                  <Text style={styles.loadingSubtext}>We'll notify you when done!</Text>
+                </View>
+              </View>
+            )}
+            
             {outfits.map((outfit) => (
               <TouchableOpacity 
                 key={outfit.id} 
@@ -263,15 +393,6 @@ export default function HomeScreen() {
           onClose={handleCloseModal}
           onSubmit={handleSubmitSelection}
           imageUri={lastCapturedImage || undefined}
-        />
-      )}
-      
-      {/* Loading Overlay */}
-      {loadingVisible && (
-        <LoadingOverlay
-          visible={loadingVisible}
-          imageUri={lastCapturedImage || undefined}
-          onComplete={handleAnalysisComplete}
         />
       )}
     </ScrollView>
@@ -327,9 +448,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   dayCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: "#EEEEEE",
     justifyContent: "center",
     alignItems: "center",
@@ -343,7 +464,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFE0CC",
   },
   dayText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "600",
     color: "#666666",
   },
@@ -451,10 +572,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
+    height: 80,
   },
   recentOutfitImage: {
-    width: 100,
-    height: "100%",
+    width: 80,
+    height: 80,
     resizeMode: "cover",
   },
   recentOutfitInfo: {
@@ -487,5 +609,69 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#666666",
     marginLeft: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    padding: 16,
+    justifyContent: 'center',
+  },
+  loadingTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#000000',
+    marginBottom: 4,
+  },
+  loadingSubtext: {
+    fontSize: 12,
+    color: '#666666',
+  },
+  loadingProgressBar: {
+    height: 4,
+    backgroundColor: '#EEEEEE',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  loadingProgressFill: {
+    height: '100%',
+    backgroundColor: '#000000',
+    borderRadius: 2,
+  },
+  loadingImageContainer: {
+    width: 80,
+    height: 80,
+    position: 'relative',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingCircle: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingSpinner: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    borderRadius: 25,
+    borderWidth: 2,
+    borderColor: '#000',
+    borderTopColor: 'transparent',
+    borderRightColor: 'transparent',
+  },
+  loadingPercentage: {
+    color: '#000000',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });

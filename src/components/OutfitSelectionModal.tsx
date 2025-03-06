@@ -12,10 +12,14 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 
 // Style categories
 const CATEGORIES = [
-  { id: 'casual', label: 'Casual Wear', icon: 'smile-o' },
-  { id: 'formal', label: 'Formal Wear', icon: 'black-tie' },
   { id: 'streetwear', label: 'Streetwear', icon: 'street-view' },
-  { id: 'athletic', label: 'Athletic Wear', icon: 'futbol-o' },
+  { id: 'formal', label: 'Formal Wear', icon: 'black-tie' },
+  { id: 'business', label: 'Business Casual', icon: 'briefcase' },
+  { id: 'smart', label: 'Smart Casual', icon: 'user-tie' },
+  { id: 'techwear', label: 'Techwear', icon: 'microchip' },
+  { id: 'athleisure', label: 'Athleisure', icon: 'futbol-o' },
+  { id: 'minimalist', label: 'Minimalist', icon: 'minus-square-o' },
+  { id: 'y2k', label: 'Y2K / Trendy', icon: 'star-o' }
 ];
 
 // Gender options
