@@ -1,9 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, Text, Image, Animated, Easing } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
+import { 
+  StyleSheet, 
+  View, 
+  Text, 
+  Animated, 
+  Easing, 
+  Image
+} from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
-import * as Haptics from 'expo-haptics';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -16,64 +20,68 @@ const LOADING_STATES = [
   { progress: 99, message: 'Finalizing your style report...' },
 ];
 
-export default function AnalysisScreen() {
-  const { imageUri, category } = useLocalSearchParams<{ imageUri: string; category: string }>();
+interface LoadingOverlayProps {
+  visible: boolean;
+  imageUri?: string;
+  onComplete: (score: number) => void;
+}
+
+export default function LoadingOverlay({ 
+  visible, 
+  imageUri, 
+  onComplete 
+}: LoadingOverlayProps) {
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState('Initializing analysis...');
   const animatedValue = new Animated.Value(0);
   
-  // Simulate the analysis process with timed animations
   useEffect(() => {
-    // Create animations for each loading state
-    const animations = LOADING_STATES.map((state, index) => {
-      const duration = index === LOADING_STATES.length - 1 ? 4000 : 2000; // Longer duration for final state
-      return Animated.timing(animatedValue, {
-        toValue: state.progress / 100,
-        duration,
-        easing: Easing.inOut(Easing.ease),
-        useNativeDriver: false,
+    if (visible) {
+      // Reset progress when overlay becomes visible
+      setProgress(0);
+      animatedValue.setValue(0);
+      
+      // Create animations for each loading state
+      const animations = LOADING_STATES.map((state, index) => {
+        const duration = index === LOADING_STATES.length - 1 ? 4000 : 2000; // Longer duration for final state
+        return Animated.timing(animatedValue, {
+          toValue: state.progress / 100,
+          duration,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: false,
+        });
       });
-    });
 
-    // Start the animation sequence
-    Animated.sequence(animations).start();
+      // Start the animation sequence
+      Animated.sequence(animations).start();
 
-    // Update progress and status text based on animated value
-    animatedValue.addListener(({ value }) => {
-      const currentProgress = Math.floor(value * 100);
-      setProgress(currentProgress);
-      
-      // Find the appropriate status message
-      const currentState = LOADING_STATES.find(state => currentProgress <= state.progress);
-      if (currentState) {
-        setStatus(currentState.message);
-      }
-      
-      // Trigger haptic feedback at certain thresholds
-      if (LOADING_STATES.some(state => state.progress === currentProgress)) {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }
-    });
-    
-    // Navigate to results after the full animation
-    const navigationTimer = setTimeout(() => {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.replace({
-        pathname: '/results' as any,
-        params: { 
-          imageUri,
-          category,
-          score: Math.floor(Math.random() * 30) + 70, // Random score between 70-99
+      // Update progress and status text based on animated value
+      animatedValue.addListener(({ value }) => {
+        const currentProgress = Math.floor(value * 100);
+        setProgress(currentProgress);
+        
+        // Find the appropriate status message
+        const currentState = LOADING_STATES.find(state => currentProgress <= state.progress);
+        if (currentState) {
+          setStatus(currentState.message);
         }
       });
-    }, 12000);
-    
-    // Clean up
-    return () => {
-      animatedValue.removeAllListeners();
-      clearTimeout(navigationTimer);
-    };
-  }, []);
+      
+      // Generate a random score between 70-99 and call onComplete after animation
+      const navigationTimer = setTimeout(() => {
+        const randomScore = Math.floor(Math.random() * 30) + 70;
+        onComplete(randomScore);
+      }, 12000);
+      
+      // Clean up
+      return () => {
+        animatedValue.removeAllListeners();
+        clearTimeout(navigationTimer);
+      };
+    }
+  }, [visible, onComplete]);
+  
+  if (!visible) return null;
   
   // Calculate the circle's circumference and stroke-dashoffset
   const circleCircumference = 2 * Math.PI * 45;
@@ -81,8 +89,6 @@ export default function AnalysisScreen() {
   
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
-      
       {/* Background Image (dimmed) */}
       {imageUri && (
         <Image 
@@ -131,8 +137,8 @@ export default function AnalysisScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#000000',
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1000,
   },
   backgroundImage: {
     ...StyleSheet.absoluteFillObject,
@@ -140,12 +146,15 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.7)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   progressContainer: {
     alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    padding: 30,
+    borderRadius: 20,
   },
   progressCircleContainer: {
     width: 100,

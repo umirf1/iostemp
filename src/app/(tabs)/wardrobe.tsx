@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { StyleSheet, FlatList, Image, TouchableOpacity, TextInput } from "react-native";
+import { StyleSheet, FlatList, Image, TouchableOpacity, TextInput, Platform, View as RNView } from "react-native";
 import { Text, View } from "@/components/Themed";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 
@@ -7,7 +7,7 @@ import FontAwesome from "@expo/vector-icons/FontAwesome";
 const MOCK_OUTFITS = [
   {
     id: "outfit1",
-    imageUri: "https://via.placeholder.com/300x400",
+    imageUri: "https://picsum.photos/300/400?random=1",
     timestamp: "2023-06-15T14:30:00Z",
     category: "Streetwear",
     overallScore: 85,
@@ -19,7 +19,7 @@ const MOCK_OUTFITS = [
   },
   {
     id: "outfit2",
-    imageUri: "https://via.placeholder.com/300x400",
+    imageUri: "https://picsum.photos/300/400?random=2",
     timestamp: "2023-06-14T10:15:00Z",
     category: "Business Casual",
     overallScore: 92,
@@ -31,7 +31,7 @@ const MOCK_OUTFITS = [
   },
   {
     id: "outfit3",
-    imageUri: "https://via.placeholder.com/300x400",
+    imageUri: "https://picsum.photos/300/400?random=3",
     timestamp: "2023-06-12T18:45:00Z",
     category: "Minimalist",
     overallScore: 78,
@@ -47,14 +47,21 @@ const MOCK_OUTFITS = [
 const SORT_OPTIONS = [
   { id: "recent", label: "Recent" },
   { id: "oldest", label: "Oldest" },
-  { id: "highest", label: "Highest Rated" },
-  { id: "lowest", label: "Lowest Rated" }
+  { id: "highest", label: "Highest Rated" }
 ];
 
 export default function WardrobeScreen() {
-  const [searchQuery, setSearchQuery] = useState("");
   const [selectedSort, setSelectedSort] = useState("recent");
   const [outfits, setOutfits] = useState(MOCK_OUTFITS);
+  
+  // Get emoji based on score
+  const getScoreEmoji = (score: number) => {
+    if (score <= 20) return "😢";
+    if (score <= 40) return "😕";
+    if (score <= 60) return "😊";
+    if (score <= 80) return "😃";
+    return "🔥";
+  };
   
   // Format date for display
   const formatDate = (dateString: string) => {
@@ -64,6 +71,15 @@ export default function WardrobeScreen() {
       day: "numeric", 
       year: "numeric" 
     });
+  };
+  
+  // Get feedback message based on score
+  const getFeedbackMessage = (score: number) => {
+    if (score <= 20) return "Tap for personalized style tips to improve";
+    if (score <= 40) return "Click to see how to level up your look";
+    if (score <= 60) return "See what makes this a good foundation";
+    if (score <= 80) return "Tap to see what makes this outfit work";
+    return "See what makes this outfit amazing";
   };
   
   // Handle sorting
@@ -82,9 +98,6 @@ export default function WardrobeScreen() {
       case "highest":
         sortedOutfits.sort((a, b) => b.overallScore - a.overallScore);
         break;
-      case "lowest":
-        sortedOutfits.sort((a, b) => a.overallScore - b.overallScore);
-        break;
     }
     
     setOutfits(sortedOutfits);
@@ -100,23 +113,19 @@ export default function WardrobeScreen() {
           <Text style={styles.outfitDate}>{formatDate(item.timestamp)}</Text>
         </View>
         <View style={styles.scoreContainer}>
-          <Text style={styles.scoreLabel}>Score</Text>
-          <Text style={styles.scoreValue}>{item.overallScore}</Text>
+          <RNView style={styles.scoreLabelContainer}>
+            <Text style={styles.scoreEmoji}>{getScoreEmoji(item.overallScore)}</Text>
+            <Text style={styles.scoreLabel}>Score:</Text>
+          </RNView>
+          <RNView style={styles.scoreValueContainer}>
+            <Text style={styles.scoreValue}>{item.overallScore}</Text>
+            <Text style={styles.scoreTotal}>/100</Text>
+          </RNView>
         </View>
-        <View style={styles.metricsContainer}>
-          <View style={styles.metricItem}>
-            <Text style={styles.metricLabel}>Style</Text>
-            <Text style={styles.metricValue}>{item.metrics.style}</Text>
-          </View>
-          <View style={styles.metricItem}>
-            <Text style={styles.metricLabel}>Trend</Text>
-            <Text style={styles.metricValue}>{item.metrics.trend}</Text>
-          </View>
-          <View style={styles.metricItem}>
-            <Text style={styles.metricLabel}>Creativity</Text>
-            <Text style={styles.metricValue}>{item.metrics.creativity}</Text>
-          </View>
-        </View>
+        <RNView style={styles.feedbackContainer}>
+          <Text style={styles.feedbackMessage}>{getFeedbackMessage(item.overallScore)}</Text>
+          <FontAwesome name="chevron-right" size={14} color="#666666" />
+        </RNView>
       </View>
     </TouchableOpacity>
   );
@@ -125,21 +134,10 @@ export default function WardrobeScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>Wardrobe</Text>
       
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <FontAwesome name="search" size={16} color="#999" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search outfits..."
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-      </View>
-      
       {/* Sort Options */}
-      <View style={styles.sortContainer}>
+      <RNView style={styles.sortContainer}>
         <Text style={styles.sortLabel}>Sort by:</Text>
-        <View style={styles.sortOptions}>
+        <RNView style={styles.sortOptions}>
           {SORT_OPTIONS.map((option) => (
             <TouchableOpacity
               key={option.id}
@@ -159,8 +157,8 @@ export default function WardrobeScreen() {
               </Text>
             </TouchableOpacity>
           ))}
-        </View>
-      </View>
+        </RNView>
+      </RNView>
       
       {/* Outfit List */}
       <FlatList
@@ -177,67 +175,50 @@ export default function WardrobeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
     backgroundColor: "#F5F5F5",
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingHorizontal: 16,
   },
   title: {
-    fontSize: 34,
+    fontSize: 32,
     fontWeight: "bold",
-    marginBottom: 16,
-    marginTop: 8,
-  },
-  searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    paddingVertical: 12,
-    fontSize: 16,
+    marginBottom: 20,
   },
   sortContainer: {
     marginBottom: 16,
+    backgroundColor: 'transparent',
   },
   sortLabel: {
     fontSize: 16,
     fontWeight: "600",
     marginBottom: 8,
+    color: '#000000',
   },
   sortOptions: {
     flexDirection: "row",
     flexWrap: "wrap",
+    gap: 8,
+    backgroundColor: 'transparent',
   },
   sortOption: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: "#FFFFFF",
-    marginRight: 8,
-    marginBottom: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: "#EEEEEE",
+    borderColor: "#999999",
   },
   sortOptionSelected: {
     backgroundColor: "#000000",
+    borderColor: "#000000",
   },
   sortOptionText: {
     fontSize: 14,
-    color: "#333333",
+    color: "#666666",
+    fontWeight: "500",
   },
   sortOptionTextSelected: {
     color: "#FFFFFF",
+    fontWeight: "600",
   },
   outfitList: {
     paddingBottom: 16,
@@ -278,31 +259,44 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 12,
+    justifyContent: "space-between",
+  },
+  scoreLabelContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  scoreEmoji: {
+    fontSize: 20,
+    marginRight: 6,
   },
   scoreLabel: {
     fontSize: 18,
     fontWeight: "bold",
-    marginRight: 8,
+  },
+  scoreValueContainer: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   scoreValue: {
     fontSize: 24,
     fontWeight: "bold",
   },
-  metricsContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  scoreTotal: {
+    fontSize: 16,
+    color: "#666666",
+    marginLeft: 1,
   },
-  metricItem: {
-    alignItems: "center",
-    flex: 1,
+  feedbackContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    paddingRight: 4,
   },
-  metricLabel: {
+  feedbackMessage: {
     fontSize: 14,
     color: "#666666",
-    marginBottom: 4,
-  },
-  metricValue: {
-    fontSize: 16,
-    fontWeight: "600",
+    flex: 1,
+    fontStyle: "italic",
   },
 }); 

@@ -1,8 +1,11 @@
-import { StyleSheet, TouchableOpacity, Image, ScrollView, View, Animated } from "react-native";
+import React, { useRef, useEffect, useState } from "react";
+import { StyleSheet, TouchableOpacity, Image, ScrollView, View, Animated, Platform } from "react-native";
 import { Text } from "@/components/Themed";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
-import { router } from "expo-router";
-import { useRef, useEffect } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+// Import the components
+import OutfitSelectionModal from "@/components/OutfitSelectionModal";
+import LoadingOverlay from "@/components/LoadingOverlay";
 
 const STEPS = [
   {
@@ -10,7 +13,7 @@ const STEPS = [
     icon: "camera-retro" as const,
     title: "Capture",
     description: "Take a photo of your outfit",
-    action: () => router.push("/camera")
+    action: () => router.push("/camera" as any)
   },
   {
     id: 2,
@@ -28,32 +31,107 @@ const STEPS = [
   }
 ];
 
+// Interface for outfit data
+interface OutfitData {
+  id: string;
+  imageUri: string;
+  category: string;
+  gender: string;
+  score: number;
+  timestamp: string;
+}
+
 export default function HomeScreen() {
-  const fadeAnims = useRef(STEPS.map(() => new Animated.Value(0))).current;
+  const params = useLocalSearchParams();
+  const [selectionModalVisible, setSelectionModalVisible] = useState(false);
+  const [loadingVisible, setLoadingVisible] = useState(false);
+  const [lastCapturedImage, setLastCapturedImage] = useState<string | null>(null);
+  const [outfits, setOutfits] = useState<OutfitData[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>('casual');
+  const [selectedGender, setSelectedGender] = useState<string>('neutral');
+  const [streakCount, setStreakCount] = useState<number>(3); // Default streak count
+  const stepsAnimatedValues = useRef(STEPS.map(() => new Animated.Value(0))).current;
   
+  // Check for captured image from camera
   useEffect(() => {
-    Animated.stagger(200, 
-      fadeAnims.map(anim => 
-        Animated.spring(anim, {
-          toValue: 1,
-          useNativeDriver: true,
-          tension: 50,
-          friction: 7
-        })
-      )
-    ).start();
+    if (params.capturedImage) {
+      console.log("Captured image received:", params.capturedImage);
+      setLastCapturedImage(params.capturedImage as string);
+      setSelectionModalVisible(true);
+    }
+  }, [params.capturedImage]);
+
+  // Animate steps sequentially
+  useEffect(() => {
+    const animations = stepsAnimatedValues.map((anim, index) => {
+      return Animated.timing(anim, {
+        toValue: 1,
+        duration: 400,
+        delay: index * 300,
+        useNativeDriver: true,
+      });
+    });
+
+    Animated.sequence(animations).start();
   }, []);
 
+  const handleCameraPress = () => {
+    router.push("/camera" as any);
+  };
+
+  const handleCloseModal = () => {
+    setSelectionModalVisible(false);
+  };
+
+  const handleSubmitSelection = (category: string, gender: string) => {
+    console.log("Selection submitted:", { category, gender });
+    setSelectedCategory(category);
+    setSelectedGender(gender);
+    setSelectionModalVisible(false);
+    setLoadingVisible(true);
+  };
+
+  const handleAnalysisComplete = (score: number) => {
+    setLoadingVisible(false);
+    
+    // Add the new outfit to the list
+    if (lastCapturedImage) {
+      const newOutfit: OutfitData = {
+        id: Date.now().toString(),
+        imageUri: lastCapturedImage,
+        category: selectedCategory,
+        gender: selectedGender,
+        score: score,
+        timestamp: new Date().toISOString()
+      };
+      
+      setOutfits([newOutfit, ...outfits]);
+      setLastCapturedImage(null);
+    }
+  };
+
   // Mock data for streak and recent outfits
-  const streakCount = 1;
   const weekDays = ["M", "T", "W", "T", "F", "S", "S"];
   const currentDay = 2; // Wednesday (0-indexed)
   
-  const recentOutfits = []; // Empty for now to show empty state
-  
-  // Navigate to camera screen
-  const handleUploadPress = () => {
-    router.push("/camera");
+  // Helper function to get relative time
+  const getRelativeTime = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    
+    if (diffInHours < 1) return 'Just now';
+    if (diffInHours < 24) return `${diffInHours}h ago`;
+    return `${Math.floor(diffInHours / 24)}d ago`;
+  };
+
+  // Get emoji based on score
+  const getScoreEmoji = (score: number) => {
+    if (score <= 20) return "😢";
+    if (score <= 40) return "😕";
+    if (score <= 60) return "😊";
+    if (score <= 80) return "😃";
+    return "🔥";
   };
   
   const renderStepCard = (step: typeof STEPS[0], index: number) => (
@@ -62,9 +140,9 @@ export default function HomeScreen() {
         style={[
           styles.stepCard,
           {
-            opacity: fadeAnims[index],
+            opacity: stepsAnimatedValues[index],
             transform: [{
-              translateY: fadeAnims[index].interpolate({
+              translateY: stepsAnimatedValues[index].interpolate({
                 inputRange: [0, 1],
                 outputRange: [50, 0]
               })
@@ -74,7 +152,7 @@ export default function HomeScreen() {
       >
         <TouchableOpacity 
           style={styles.stepContent}
-          onPress={step.action}
+          onPress={index === 0 ? handleCameraPress : step.action}
           activeOpacity={0.8}
         >
           <View style={styles.stepNumber}>
@@ -87,16 +165,14 @@ export default function HomeScreen() {
       </Animated.View>
       {index < STEPS.length - 1 && (
         <View style={styles.stepConnector}>
-          <View style={styles.stepDot} />
-          <View style={styles.stepDot} />
-          <View style={styles.stepDot} />
+          {/* Remove dots between steps */}
         </View>
       )}
     </View>
   );
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       <View style={styles.header}>
         <Text style={styles.logo}>FitcheckAI</Text>
         <View style={styles.streakContainer}>
@@ -112,12 +188,12 @@ export default function HomeScreen() {
             const isCompleted = index < currentDay;
             const isCurrent = index === currentDay;
             return (
-              <View 
-                key={index} 
+              <View
+                key={day}
                 style={[
                   styles.dayCircle,
-                  isCurrent && styles.currentDay,
                   isCompleted && styles.completedDay,
+                  isCurrent && styles.currentDay
                 ]}
               >
                 <Text style={[
@@ -131,7 +207,7 @@ export default function HomeScreen() {
           })}
         </View>
       </View>
-
+      
       {/* Three Steps Section */}
       <View style={styles.stepsContainer}>
         <Text style={styles.stepsTitle}>How it works</Text>
@@ -144,21 +220,60 @@ export default function HomeScreen() {
       <View style={styles.recentSection}>
         <Text style={styles.sectionTitle}>Recently logged</Text>
         
-        {recentOutfits.length === 0 ? (
+        {outfits.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateText}>
-              You haven't uploaded any outfits
-            </Text>
-            <Text style={styles.emptyStateSubtext}>
-              Start tracking today's style by taking a quick picture.
+              No outfits yet. Take a photo to get started!
             </Text>
           </View>
         ) : (
           <View>
-            {/* Outfit cards will go here when we have data */}
+            {outfits.map((outfit) => (
+              <TouchableOpacity 
+                key={outfit.id} 
+                style={styles.recentOutfitCard}
+                onPress={() => {
+                  router.push({
+                    pathname: "/results" as any,
+                    params: { outfitId: outfit.id }
+                  });
+                }}
+              >
+                <Image source={{ uri: outfit.imageUri }} style={styles.recentOutfitImage} />
+                <View style={styles.recentOutfitInfo}>
+                  <View style={styles.recentOutfitHeader}>
+                    <Text style={styles.recentOutfitCategory}>{outfit.category}</Text>
+                    <Text style={styles.recentOutfitTime}>{getRelativeTime(outfit.timestamp)}</Text>
+                  </View>
+                  <View style={styles.recentOutfitScore}>
+                    <Text style={styles.recentOutfitScoreText}>{getScoreEmoji(outfit.score)}</Text>
+                    <Text style={styles.recentOutfitScoreTotal}>{outfit.score}/100</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))}
           </View>
         )}
       </View>
+      
+      {/* Outfit Selection Modal */}
+      {selectionModalVisible && (
+        <OutfitSelectionModal
+          visible={selectionModalVisible}
+          onClose={handleCloseModal}
+          onSubmit={handleSubmitSelection}
+          imageUri={lastCapturedImage || undefined}
+        />
+      )}
+      
+      {/* Loading Overlay */}
+      {loadingVisible && (
+        <LoadingOverlay
+          visible={loadingVisible}
+          imageUri={lastCapturedImage || undefined}
+          onComplete={handleAnalysisComplete}
+        />
+      )}
     </ScrollView>
   );
 }
@@ -166,15 +281,18 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: "#f8f9fa",
+  },
+  contentContainer: {
+    paddingBottom: 40,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
+    paddingTop: Platform.OS === "ios" ? 60 : 40,
+    paddingBottom: 16,
     backgroundColor: "transparent",
   },
   logo: {
@@ -212,23 +330,21 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    borderWidth: 2,
-    borderColor: "#DDDDDD",
-    borderStyle: "dotted",
+    backgroundColor: "#EEEEEE",
     justifyContent: "center",
     alignItems: "center",
   },
   currentDay: {
+    backgroundColor: "#FFE0CC",
+    borderWidth: 2,
     borderColor: "#FF6B00",
-    borderStyle: "solid",
   },
   completedDay: {
-    borderStyle: "solid",
-    borderColor: "#4CAF50",
+    backgroundColor: "#FFE0CC",
   },
   dayText: {
     fontSize: 14,
-    fontWeight: "500",
+    fontWeight: "600",
     color: "#666666",
   },
   stepsContainer: {
@@ -241,19 +357,18 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   stepsContent: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 15,
   },
   stepWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
     flex: 1,
+    alignItems: 'center',
   },
   stepCard: {
+    flex: 1,
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
-    flex: 1,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -261,54 +376,47 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   stepContent: {
-    padding: 12,
+    padding: 16,
     alignItems: "center",
   },
   stepNumber: {
-    position: "absolute",
-    top: 8,
-    left: 8,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: "#FF6B00",
     justifyContent: "center",
     alignItems: "center",
+    marginBottom: 12,
   },
   stepNumberText: {
     color: "#FFFFFF",
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "bold",
   },
   stepIcon: {
-    marginTop: 12,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   stepTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "600",
     marginBottom: 4,
+    textAlign: "center",
   },
   stepDescription: {
-    fontSize: 11,
+    fontSize: 12,
     color: "#666666",
     textAlign: "center",
   },
   stepConnector: {
-    width: 16,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 2,
-  },
-  stepDot: {
-    width: 2,
-    height: 2,
-    borderRadius: 1,
-    backgroundColor: '#DDDDDD',
+    height: 10,
+    width: 1,
+    backgroundColor: 'transparent',
+    marginVertical: 0,
+    alignSelf: 'center',
   },
   recentSection: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 24,
     backgroundColor: "transparent",
   },
   sectionTitle: {
@@ -330,12 +438,54 @@ const styles = StyleSheet.create({
   emptyStateText: {
     fontSize: 18,
     fontWeight: "600",
-    marginBottom: 8,
     textAlign: "center",
   },
-  emptyStateSubtext: {
+  recentOutfitCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    marginBottom: 16,
+    flexDirection: "row",
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  recentOutfitImage: {
+    width: 100,
+    height: "100%",
+    resizeMode: "cover",
+  },
+  recentOutfitInfo: {
+    flex: 1,
+    padding: 12,
+    justifyContent: "space-between",
+  },
+  recentOutfitHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  recentOutfitCategory: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  recentOutfitTime: {
+    fontSize: 14,
+    color: "#999999",
+  },
+  recentOutfitScore: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  recentOutfitScoreText: {
+    fontSize: 20,
+    marginRight: 8,
+  },
+  recentOutfitScoreTotal: {
     fontSize: 16,
     color: "#666666",
-    textAlign: "center",
+    marginLeft: 1,
   },
 });

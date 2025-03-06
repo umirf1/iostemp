@@ -15,14 +15,25 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.fitcheckai.app"
+      "bundleIdentifier": "com.fitcheckai.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app uses the camera to take photos of your outfits for style analysis.",
+        "NSMicrophoneUsageDescription": "This app uses the microphone for video recording.",
+        "NSPhotoLibraryUsageDescription": "This app saves photos to your photo library and allows you to select photos from your library."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./src/assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.fitcheckai.app"
+      "package": "com.fitcheckai.app",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -33,7 +44,27 @@
       "expo-router",
       "expo-secure-store",
       "expo-sqlite",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-camera",
+        {
+          "cameraPermissionText": "This app needs access to your camera to take photos of your outfits."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "This app needs access to your photos to select images for outfit analysis."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "This app needs access to your media library to save photos.",
+          "savePhotosPermission": "This app needs access to save photos to your media library.",
+          "isAccessMediaLocationEnabled": true
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

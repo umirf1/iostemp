@@ -1,4 +1,4 @@
-import { StyleSheet, ScrollView, Switch, TouchableOpacity } from "react-native";
+import { StyleSheet, ScrollView, Switch, TouchableOpacity, Platform } from "react-native";
 import { Text, View } from "@/components/Themed";
 import { useState } from "react";
 
@@ -76,13 +76,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     backgroundColor: "#F5F5F5",
   },
   header: {
-    fontSize: 34,
+    fontSize: 32,
     fontWeight: "bold",
     marginBottom: 24,
-    marginTop: 8,
   },
   section: {
     backgroundColor: "#FFFFFF",

@@ -56,10 +56,23 @@ function RootLayoutNav() {
   const colorScheme = useColorScheme();
 
   return (
-    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={DefaultTheme}>
       <MigrationProvider>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack 
+          screenOptions={{ 
+            headerShown: false,
+            contentStyle: { 
+              backgroundColor: '#fff'
+            },
+            animation: 'fade',
+          }}
+        >
+          <Stack.Screen 
+            name="(tabs)" 
+            options={{ 
+              headerShown: false,
+            }} 
+          />
           <Stack.Screen name="modal" options={{ presentation: "modal" }} />
           <Stack.Screen
             name="sheet"
@@ -75,6 +88,14 @@ function RootLayoutNav() {
             options={{ 
               headerShown: false,
               presentation: "fullScreenModal"
+            }} 
+          />
+          <Stack.Screen 
+            name="category-select" 
+            options={{ 
+              headerShown: false,
+              presentation: "card",
+              animation: "slide_from_right"
             }} 
           />
           <Stack.Screen 
