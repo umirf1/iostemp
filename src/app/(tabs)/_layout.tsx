@@ -1,7 +1,7 @@
-import React from "react";
+import React, { useState, useRef } from "react";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { Link, Tabs } from "expo-router";
-import { View, TouchableOpacity, StyleSheet, Platform } from "react-native";
+import { View, TouchableOpacity, StyleSheet, Platform, Animated, Text } from "react-native";
 import { router } from "expo-router";
 
 import Colors from "@/lib/constants/Colors";
@@ -19,82 +19,83 @@ function TabBarIcon(props: {
 export default function TabLayout() {
   const colorScheme = useColorScheme();
 
+  const handleCameraPress = () => {
+    router.push("/camera");
+  };
+
   return (
-    <>
+    <View style={{ flex: 1 }}>
       <Tabs
         screenOptions={{
-          tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
-          // Disable the static render of the header on web
-          // to prevent a hydration error in React Navigation v6.
-          headerShown: useClientOnlyValue(false, true),
-          tabBarShowLabel: true,
+          tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+          headerShown: false,
           tabBarStyle: {
-            height: 90,
-            paddingBottom: 32,
-            backgroundColor: '#FFFFFF',
-            borderTopWidth: 1,
-            borderTopColor: '#EEEEEE',
-          },
+            borderTopWidth: 0,
+            elevation: 0,
+            shadowOpacity: 0,
+            height: 60,
+            paddingBottom: 10,
+          }
         }}
       >
         <Tabs.Screen
           name="index"
           options={{
-            title: "Home",
+            title: 'Home',
             tabBarIcon: ({ color }) => <TabBarIcon name="home" color={color} />,
-            headerTitle: "FitcheckAI",
           }}
         />
         <Tabs.Screen
           name="wardrobe"
           options={{
-            title: "Wardrobe",
+            title: 'Wardrobe',
             tabBarIcon: ({ color }) => <TabBarIcon name="archive" color={color} />,
           }}
         />
         <Tabs.Screen
           name="settings"
           options={{
-            title: "Settings",
+            title: 'Settings',
             tabBarIcon: ({ color }) => <TabBarIcon name="gear" color={color} />,
           }}
         />
       </Tabs>
-      
-      {/* Floating Action Button */}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => router.push("/camera")}
-      >
-        <TabBarIcon name="plus" color="#FFFFFF" />
-      </TouchableOpacity>
-    </>
+
+      {/* FAB Container */}
+      <View style={styles.fabContainer} pointerEvents="box-none">
+        {/* Main FAB */}
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={handleCameraPress}
+        >
+          <TabBarIcon name="plus" color="#FFFFFF" />
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  fab: {
+  fabContainer: {
     position: 'absolute',
-    bottom: 110,
+    bottom: 80,
     right: 20,
+  },
+  fab: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "#000000",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 999,
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 6,
-      },
-      android: {
-        elevation: 8,
-      },
-    }),
-  },
+    backgroundColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  }
 });
 
