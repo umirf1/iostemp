@@ -1,10 +1,33 @@
-import { StyleSheet, ScrollView, Switch, TouchableOpacity, Platform } from "react-native";
+import { StyleSheet, ScrollView, Switch, TouchableOpacity, Platform, Alert } from "react-native";
 import { Text, View } from "@/components/Themed";
 import { useState } from "react";
+import { resetOnboardingStatus } from "@/lib/onboarding";
+import { router } from "expo-router";
 
 export default function SettingsScreen() {
   const [notifications, setNotifications] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
+  
+  const handleResetOnboarding = async () => {
+    Alert.alert(
+      "Reset Onboarding",
+      "Are you sure you want to reset the onboarding experience? The app will restart.",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Reset",
+          onPress: async () => {
+            await resetOnboardingStatus();
+            // Navigate to onboarding
+            router.replace("/onboarding");
+          }
+        }
+      ]
+    );
+  };
   
   return (
     <ScrollView style={styles.container}>
@@ -68,6 +91,17 @@ export default function SettingsScreen() {
           />
         </View>
       </View>
+      
+      {/* Developer Options */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Developer Options</Text>
+        <TouchableOpacity 
+          style={[styles.settingRow, styles.resetButton]} 
+          onPress={handleResetOnboarding}
+        >
+          <Text style={styles.resetButtonText}>Reset Onboarding</Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 }
@@ -103,9 +137,7 @@ const styles = StyleSheet.create({
   profileInfo: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    marginBottom: 12,
   },
   label: {
     fontSize: 16,
@@ -113,33 +145,33 @@ const styles = StyleSheet.create({
   },
   value: {
     fontSize: 16,
+    fontWeight: "500",
   },
   subscriptionCard: {
-    alignItems: "center",
+    backgroundColor: "#F9F9F9",
+    borderRadius: 8,
     padding: 16,
+    alignItems: "center",
   },
   subscriptionTitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: "#666",
+    marginBottom: 8,
   },
   subscriptionAmount: {
-    fontSize: 36,
+    fontSize: 32,
     fontWeight: "bold",
-    marginVertical: 8,
+    marginBottom: 16,
   },
   referralButton: {
-    backgroundColor: "#000",
+    backgroundColor: "#FF6B00",
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 24,
-    marginTop: 8,
-    width: "100%",
-    alignItems: "center",
   },
   referralButtonText: {
     color: "#FFF",
     fontWeight: "600",
-    fontSize: 16,
   },
   settingRow: {
     flexDirection: "row",
@@ -155,5 +187,20 @@ const styles = StyleSheet.create({
   chevron: {
     fontSize: 20,
     color: "#999",
+  },
+  resetButton: {
+    backgroundColor: "#FF6B00",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 24,
+    marginTop: 8,
+    width: "100%",
+    alignItems: "center",
+    borderBottomWidth: 0,
+  },
+  resetButtonText: {
+    color: "#FFF",
+    fontWeight: "600",
+    fontSize: 16,
   },
 }); 

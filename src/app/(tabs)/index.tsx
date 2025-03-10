@@ -6,6 +6,7 @@ import { router, useLocalSearchParams } from "expo-router";
 // Import the components
 import OutfitSelectionModal from "@/components/OutfitSelectionModal";
 import LoadingOverlay from "@/components/LoadingOverlay";
+import { analyzeOutfitImage } from "@/lib/openai";
 
 const STEPS = [
   {
@@ -39,6 +40,14 @@ interface OutfitData {
   gender: string;
   score: number;
   timestamp: string;
+  feedback?: string;
+  details?: {
+    style?: number;
+    fit?: number;
+    color?: number;
+    occasion?: number;
+  };
+  suggestions?: string[];
 }
 
 export default function HomeScreen() {
@@ -156,59 +165,103 @@ export default function HomeScreen() {
     setSelectionModalVisible(false);
   };
 
-  const handleSubmitSelection = (category: string, gender: string) => {
+  const handleSubmitSelection = async (category: string, gender: string) => {
     console.log("Selection submitted:", { category, gender });
     setSelectedCategory(category);
     setSelectedGender(gender);
     setSelectionModalVisible(false);
     
+    if (!lastCapturedImage) {
+      console.error("No image captured");
+      return;
+    }
+    
+    // Save the image URI for later use
+    const imageUri = lastCapturedImage;
+    console.log("Using image URI:", imageUri);
+    
     // Create a temporary loading outfit entry
     const loadingId = Date.now().toString();
     setLoadingOutfit({
       id: loadingId,
-      imageUri: lastCapturedImage || '',
+      imageUri: imageUri,
       progress: 24
     });
 
-    // Simulate progress updates with slower timing
-    const progressIntervals = [
-      { progress: 45, delay: 2000 },
-      { progress: 75, delay: 4000 },
-      { progress: 89, delay: 6000 },
-      { progress: 99, delay: 8000 }
-    ];
-
-    progressIntervals.forEach(({ progress, delay }) => {
+    try {
+      // Update progress as analysis happens
+      const progressUpdates = [
+        { progress: 45, delay: 1000 },
+        { progress: 75, delay: 3000 },
+        { progress: 89, delay: 6000 }
+      ];
+      
+      // Set up progress updates
+      const progressTimers = progressUpdates.map(({ progress, delay }) => 
+        setTimeout(() => {
+          setLoadingOutfit(current => 
+            current ? { ...current, progress } : null
+          );
+        }, delay)
+      );
+      
+      // Perform the actual analysis
+      console.log("Starting analysis with image:", imageUri);
+      const result = await analyzeOutfitImage(imageUri, gender, category);
+      console.log("Analysis result:", result);
+      
+      // Clear any remaining timers
+      progressTimers.forEach(timer => clearTimeout(timer));
+      
+      // Set progress to 99% when we get the result
+      setLoadingOutfit(current => 
+        current ? { ...current, progress: 99 } : null
+      );
+      
+      // Complete the analysis after a short delay
       setTimeout(() => {
-        setLoadingOutfit(current => 
-          current ? { ...current, progress } : null
-        );
-      }, delay);
-    });
-
-    // Simulate analysis completion
-    setTimeout(() => {
-      handleAnalysisComplete(85);
+        const score = result.score || 85; // Default to 85 if no score
+        handleAnalysisComplete(imageUri, score, result.feedback || "", result.details, result.suggestions);
+        setLoadingOutfit(null);
+      }, 1000);
+      
+    } catch (error) {
+      console.error("Error analyzing outfit:", error);
       setLoadingOutfit(null);
-    }, 10000);
+      
+      // Show an error message to the user
+      alert("We encountered an issue analyzing your outfit. Please try again.");
+    }
   };
 
-  const handleAnalysisComplete = (score: number) => {
+  const handleAnalysisComplete = (
+    imageUri: string,
+    score: number, 
+    feedback: string = "", 
+    details?: OutfitData['details'],
+    suggestions?: string[]
+  ) => {
     setLoadingVisible(false);
     
     // Add the new outfit to the list
-    if (lastCapturedImage) {
+    if (imageUri) {
       const newOutfit: OutfitData = {
         id: Date.now().toString(),
-        imageUri: lastCapturedImage,
+        imageUri: imageUri,
         category: selectedCategory,
         gender: selectedGender,
         score: score,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        feedback: feedback,
+        details: details,
+        suggestions: suggestions
       };
       
+      console.log("Adding new outfit to list:", newOutfit);
       setOutfits([newOutfit, ...outfits]);
       setLastCapturedImage(null);
+    } else {
+      console.error("No image URI provided for outfit");
     }
   };
 
@@ -365,7 +418,18 @@ export default function HomeScreen() {
                 onPress={() => {
                   router.push({
                     pathname: "/results" as any,
-                    params: { outfitId: outfit.id }
+                    params: { 
+                      outfitId: outfit.id,
+                      imageUri: outfit.imageUri,
+                      category: outfit.category,
+                      gender: outfit.gender,
+                      score: outfit.score.toString(),
+                      timestamp: outfit.timestamp,
+                      feedback: outfit.feedback || '',
+                      // We can't pass complex objects directly, so we'll stringify them
+                      details: outfit.details ? JSON.stringify(outfit.details) : '',
+                      suggestions: outfit.suggestions ? JSON.stringify(outfit.suggestions) : ''
+                    }
                   });
                 }}
               >

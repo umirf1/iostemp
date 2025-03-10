@@ -1,54 +1,154 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, Text, Image, ScrollView, TouchableOpacity, Share } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { StatusBar } from 'expo-status-bar';
 
-// Mock data for outfit analysis
-const generateMockAnalysis = (score: number, category: string) => {
-  // Adjust feedback based on score range
-  let feedback = {
-    pros: [
-      "Great color coordination",
-      "Well-fitted silhouette",
-      "Excellent accessory choices"
-    ],
-    cons: [
-      "Shoes don't match the overall style",
-      "Too many competing patterns"
-    ],
-    suggestions: [
-      "Try a more minimal shoe to balance the outfit",
-      "Consider a solid-colored top to let the patterned bottom stand out"
-    ]
+// Interface for outfit data
+interface OutfitData {
+  id: string;
+  imageUri: string;
+  category: string;
+  gender: string;
+  score: number;
+  timestamp: string;
+  feedback?: string;
+  details?: {
+    style?: number;
+    fit?: number;
+    color?: number;
+    occasion?: number;
   };
-  
-  // Adjust metrics based on score
-  const metrics = {
-    style: Math.min(100, score + Math.floor(Math.random() * 10) - 5),
-    trend: Math.min(100, score + Math.floor(Math.random() * 10) - 5),
-    creativity: Math.min(100, score + Math.floor(Math.random() * 10) - 5)
-  };
-  
-  return { score, metrics, feedback, category };
-};
+  suggestions?: string[];
+}
 
 export default function ResultsScreen() {
-  const { imageUri, category, score: scoreParam } = useLocalSearchParams<{ 
-    imageUri: string; 
+  const params = useLocalSearchParams<{
+    outfitId: string;
+    imageUri: string;
     category: string;
+    gender: string;
     score: string;
+    timestamp: string;
+    feedback?: string;
+    details?: string;
+    suggestions?: string;
   }>();
   
-  const score = parseInt(scoreParam || '85', 10);
-  const analysis = generateMockAnalysis(score, category || 'Streetwear');
+  const [outfit, setOutfit] = useState<OutfitData | null>(null);
+  
+  // Parse the params to create the outfit object
+  useEffect(() => {
+    if (!params.outfitId) return;
+    
+    try {
+      // Parse details and suggestions if they exist
+      let details: OutfitData['details'] | undefined;
+      let suggestions: string[] | undefined;
+      
+      if (params.details) {
+        try {
+          details = JSON.parse(params.details);
+        } catch (e) {
+          console.error('Error parsing details:', e);
+        }
+      }
+      
+      if (params.suggestions) {
+        try {
+          suggestions = JSON.parse(params.suggestions);
+        } catch (e) {
+          console.error('Error parsing suggestions:', e);
+        }
+      }
+      
+      // Clean up feedback if it contains JSON
+      let cleanFeedback = params.feedback || '';
+      if (cleanFeedback.includes('```json') || cleanFeedback.includes('{')) {
+        try {
+          // Try to extract JSON from the feedback
+          const jsonMatch = cleanFeedback.match(/```json\s*(\{.*\})\s*```|(\{.*\})/s);
+          if (jsonMatch) {
+            const jsonStr = (jsonMatch[1] || jsonMatch[2]).trim();
+            const parsedJson = JSON.parse(jsonStr);
+            
+            // If we successfully parsed JSON, use its fields
+            if (parsedJson.feedback) {
+              cleanFeedback = parsedJson.feedback;
+            }
+            
+            // If we have details in the JSON but not from params
+            if (parsedJson.details && !details) {
+              details = parsedJson.details;
+            }
+            
+            // If we have suggestions in the JSON but not from params
+            if (parsedJson.suggestions && (!suggestions || suggestions.length === 0)) {
+              suggestions = parsedJson.suggestions;
+            }
+            
+            // If we have a score in the JSON
+            if (parsedJson.score && !params.score) {
+              params.score = parsedJson.score.toString();
+            }
+          }
+        } catch (e) {
+          console.error('Error parsing JSON from feedback:', e);
+          // Remove JSON formatting if parsing fails
+          cleanFeedback = cleanFeedback.replace(/```json|```/g, '').trim();
+        }
+      }
+      
+      // Create the outfit object from params
+      const outfitData: OutfitData = {
+        id: params.outfitId,
+        imageUri: params.imageUri,
+        category: params.category,
+        gender: params.gender,
+        score: parseInt(params.score || '0', 10),
+        timestamp: params.timestamp || new Date().toISOString(),
+        feedback: cleanFeedback,
+        details,
+        suggestions
+      };
+      
+      setOutfit(outfitData);
+    } catch (error) {
+      console.error('Error creating outfit from params:', error);
+      
+      // Fallback to a mock outfit if we can't parse the params
+      const mockOutfit: OutfitData = {
+        id: '1',
+        imageUri: params.imageUri || 'https://example.com/image.jpg',
+        category: params.category || 'Streetwear',
+        gender: params.gender || 'other',
+        score: parseInt(params.score || '85', 10),
+        timestamp: params.timestamp || new Date().toISOString(),
+        feedback: params.feedback || "Great outfit with nice color coordination.",
+        details: {
+          style: 87,
+          fit: 75,
+          color: 90,
+          occasion: 82
+        },
+        suggestions: [
+          "Try a more fitted top to balance the proportions",
+          "Consider adding a statement accessory to elevate the look"
+        ]
+      };
+      
+      setOutfit(mockOutfit);
+    }
+  }, [params]);
   
   // Handle sharing results
   const handleShare = async () => {
+    if (!outfit) return;
+    
     try {
       await Share.share({
-        message: `Check out my outfit! FitcheckAI gave me a score of ${score}/100 for my ${category} look.`,
-        // url: imageUri // Uncomment if you want to share the image
+        message: `Check out my outfit! FitcheckAI gave me a score of ${outfit.score}/100 for my ${outfit.category} look.`,
+        // url: outfit.imageUri // Uncomment if you want to share the image
       });
     } catch (error) {
       console.error('Error sharing:', error);
@@ -67,14 +167,22 @@ export default function ResultsScreen() {
     router.replace('/');
   };
   
+  if (!outfit) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <Text>Loading outfit details...</Text>
+      </View>
+    );
+  }
+  
   return (
     <ScrollView style={styles.container}>
       <StatusBar style="dark" />
       
       {/* Outfit Image */}
-      {imageUri && (
+      {outfit.imageUri && (
         <Image 
-          source={{ uri: imageUri }} 
+          source={{ uri: outfit.imageUri }} 
           style={styles.outfitImage}
           resizeMode="cover"
         />
@@ -82,117 +190,114 @@ export default function ResultsScreen() {
       
       {/* Category and Timestamp */}
       <View style={styles.header}>
-        <Text style={styles.category}>{analysis.category}</Text>
-        <Text style={styles.timestamp}>{new Date().toLocaleDateString()}</Text>
+        <Text style={styles.category}>{outfit.category}</Text>
+        <Text style={styles.timestamp}>{new Date(outfit.timestamp).toLocaleDateString()}</Text>
       </View>
       
       {/* Score */}
       <View style={styles.scoreContainer}>
         <Text style={styles.scoreLabel}>Overall Score</Text>
-        <Text style={styles.scoreValue}>{analysis.score}<Text style={styles.scoreMax}>/100</Text></Text>
+        <Text style={styles.scoreValue}>{outfit.score}<Text style={styles.scoreMax}>/100</Text></Text>
       </View>
       
       {/* Metrics */}
       <View style={styles.metricsContainer}>
-        <View style={styles.metricCard}>
-          <Text style={styles.metricLabel}>Style</Text>
-          <Text style={styles.metricValue}>{analysis.metrics.style}</Text>
-          <View style={styles.metricBar}>
-            <View 
-              style={[
-                styles.metricFill, 
-                { width: `${analysis.metrics.style}%` }
-              ]} 
-            />
+        {outfit.details?.style !== undefined && (
+          <View style={styles.metricCard}>
+            <View style={styles.metricHeader}>
+              <Text style={styles.metricLabel}>Style</Text>
+              <Text style={styles.metricValue}>{outfit.details.style}</Text>
+            </View>
+            <View style={styles.metricBar}>
+              <View 
+                style={[
+                  styles.metricFill, 
+                  { width: `${outfit.details.style}%` }
+                ]} 
+              />
+            </View>
           </View>
-        </View>
+        )}
         
-        <View style={styles.metricCard}>
-          <Text style={styles.metricLabel}>Trend</Text>
-          <Text style={styles.metricValue}>{analysis.metrics.trend}</Text>
-          <View style={styles.metricBar}>
-            <View 
-              style={[
-                styles.metricFill, 
-                { width: `${analysis.metrics.trend}%` }
-              ]} 
-            />
+        {outfit.details?.fit !== undefined && (
+          <View style={styles.metricCard}>
+            <View style={styles.metricHeader}>
+              <Text style={styles.metricLabel}>Fit</Text>
+              <Text style={styles.metricValue}>{outfit.details.fit}</Text>
+            </View>
+            <View style={styles.metricBar}>
+              <View 
+                style={[
+                  styles.metricFill, 
+                  { width: `${outfit.details.fit}%` }
+                ]} 
+              />
+            </View>
           </View>
-        </View>
+        )}
         
-        <View style={styles.metricCard}>
-          <Text style={styles.metricLabel}>Creativity</Text>
-          <Text style={styles.metricValue}>{analysis.metrics.creativity}</Text>
-          <View style={styles.metricBar}>
-            <View 
-              style={[
-                styles.metricFill, 
-                { width: `${analysis.metrics.creativity}%` }
-              ]} 
-            />
+        {outfit.details?.color !== undefined && (
+          <View style={styles.metricCard}>
+            <View style={styles.metricHeader}>
+              <Text style={styles.metricLabel}>Color</Text>
+              <Text style={styles.metricValue}>{outfit.details.color}</Text>
+            </View>
+            <View style={styles.metricBar}>
+              <View 
+                style={[
+                  styles.metricFill, 
+                  { width: `${outfit.details.color}%` }
+                ]} 
+              />
+            </View>
           </View>
-        </View>
-      </View>
-      
-      {/* Fashion Score */}
-      <View style={styles.fashionScoreContainer}>
-        <View style={styles.fashionScoreHeader}>
-          <FontAwesome name="heart" size={20} color="#FF6B00" />
-          <Text style={styles.fashionScoreLabel}>Fashion Score</Text>
-          <Text style={styles.fashionScoreValue}>{Math.floor(score / 20)}/10</Text>
-        </View>
-        <View style={styles.fashionScoreBar}>
-          <View 
-            style={[
-              styles.fashionScoreFill, 
-              { width: `${score}%` }
-            ]} 
-          />
-        </View>
+        )}
+        
+        {outfit.details?.occasion !== undefined && (
+          <View style={styles.metricCard}>
+            <View style={styles.metricHeader}>
+              <Text style={styles.metricLabel}>Occasion</Text>
+              <Text style={styles.metricValue}>{outfit.details.occasion}</Text>
+            </View>
+            <View style={styles.metricBar}>
+              <View 
+                style={[
+                  styles.metricFill, 
+                  { width: `${outfit.details.occasion}%` }
+                ]} 
+              />
+            </View>
+          </View>
+        )}
       </View>
       
       {/* Feedback */}
       <View style={styles.feedbackContainer}>
         <Text style={styles.feedbackTitle}>Analysis</Text>
         
-        {/* Pros */}
-        <View style={styles.feedbackSection}>
-          <Text style={styles.feedbackSectionTitle}>Pros</Text>
-          {analysis.feedback.pros.map((pro, index) => (
-            <View key={`pro-${index}`} style={styles.feedbackItem}>
-              <View style={styles.proIcon}>
-                <FontAwesome name="check" size={12} color="#FFFFFF" />
-              </View>
-              <Text style={styles.feedbackText}>{pro}</Text>
-            </View>
-          ))}
-        </View>
-        
-        {/* Cons */}
-        <View style={styles.feedbackSection}>
-          <Text style={styles.feedbackSectionTitle}>Cons</Text>
-          {analysis.feedback.cons.map((con, index) => (
-            <View key={`con-${index}`} style={styles.feedbackItem}>
-              <View style={styles.conIcon}>
-                <FontAwesome name="times" size={12} color="#FFFFFF" />
-              </View>
-              <Text style={styles.feedbackText}>{con}</Text>
-            </View>
-          ))}
-        </View>
+        {/* General Feedback */}
+        {outfit.feedback && (
+          <View style={styles.feedbackSection}>
+            <Text style={styles.feedbackText}>
+              {outfit.feedback.replace(/^\s*\{.*\}\s*$/s, '').trim()}
+            </Text>
+          </View>
+        )}
         
         {/* Suggestions */}
-        <View style={styles.feedbackSection}>
-          <Text style={styles.feedbackSectionTitle}>Suggestions</Text>
-          {analysis.feedback.suggestions.map((suggestion, index) => (
-            <View key={`suggestion-${index}`} style={styles.feedbackItem}>
-              <View style={styles.suggestionIcon}>
-                <FontAwesome name="lightbulb-o" size={12} color="#FFFFFF" />
+        {outfit.suggestions && outfit.suggestions.length > 0 && (
+          <View style={styles.feedbackSection}>
+            <Text style={styles.feedbackSectionTitle}>Suggestions</Text>
+            {outfit.suggestions.map((suggestion, index) => (
+              <View key={`suggestion-${index}`} style={styles.feedbackItem}>
+                <View style={styles.suggestionIcon}>
+                  <FontAwesome name="lightbulb-o" size={12} color="#FFFFFF" />
+                </View>
+                <Text style={styles.feedbackText}>{suggestion}</Text>
               </View>
-              <Text style={styles.feedbackText}>{suggestion}</Text>
-            </View>
-          ))}
-        </View>
+            ))}
+          </View>
+        )}
       </View>
       
       {/* Action Buttons */}
@@ -228,19 +333,29 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F5F5F5',
   },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    height: '100%',
+  },
   outfitImage: {
     width: '100%',
-    height: 400,
+    height: 450,
+    backgroundColor: '#E0E0E0',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     padding: 16,
     backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEEEEE',
   },
   category: {
     fontSize: 18,
     fontWeight: '600',
+    color: '#333333',
   },
   timestamp: {
     fontSize: 14,
@@ -250,6 +365,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 24,
     backgroundColor: '#FFFFFF',
+    marginBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#EEEEEE',
   },
@@ -259,31 +375,39 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   scoreValue: {
-    fontSize: 48,
+    fontSize: 64,
     fontWeight: 'bold',
+    color: '#333333',
   },
   scoreMax: {
-    fontSize: 24,
-    fontWeight: 'normal',
+    fontSize: 32,
     color: '#999999',
+    fontWeight: 'normal',
   },
   metricsContainer: {
     padding: 16,
     backgroundColor: '#FFFFFF',
     marginBottom: 16,
+    borderRadius: 8,
   },
   metricCard: {
-    marginBottom: 16,
+    marginBottom: 20,
+  },
+  metricHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   metricLabel: {
     fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
+    fontWeight: '500',
+    color: '#333333',
   },
   metricValue: {
-    fontSize: 14,
-    color: '#666666',
-    marginBottom: 4,
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4CAF50',
   },
   metricBar: {
     height: 8,
@@ -293,49 +417,20 @@ const styles = StyleSheet.create({
   },
   metricFill: {
     height: '100%',
-    backgroundColor: '#000000',
-    borderRadius: 4,
-  },
-  fashionScoreContainer: {
-    padding: 16,
-    backgroundColor: '#FFFFFF',
-    marginBottom: 16,
-  },
-  fashionScoreHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  fashionScoreLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-    flex: 1,
-  },
-  fashionScoreValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  fashionScoreBar: {
-    height: 8,
-    backgroundColor: '#EEEEEE',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  fashionScoreFill: {
-    height: '100%',
-    backgroundColor: '#FF6B00',
+    backgroundColor: '#4CAF50',
     borderRadius: 4,
   },
   feedbackContainer: {
     padding: 16,
     backgroundColor: '#FFFFFF',
     marginBottom: 16,
+    borderRadius: 8,
   },
   feedbackTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 16,
+    color: '#333333',
   },
   feedbackSection: {
     marginBottom: 16,
@@ -344,71 +439,55 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 8,
+    color: '#333333',
   },
   feedbackItem: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
     marginBottom: 8,
+    alignItems: 'flex-start',
   },
-  proIcon: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#4CAF50',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-    marginTop: 2,
-  },
-  conIcon: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#F44336',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-    marginTop: 2,
+  feedbackText: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#333333',
+    flex: 1,
   },
   suggestionIcon: {
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#2196F3',
+    backgroundColor: '#FF9800',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
     marginTop: 2,
   },
-  feedbackText: {
-    fontSize: 16,
-    lineHeight: 24,
-    flex: 1,
-  },
   actionButtons: {
     flexDirection: 'row',
-    padding: 16,
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    paddingHorizontal: 16,
   },
   actionButton: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
-    marginHorizontal: 4,
+    alignItems: 'center',
+    marginHorizontal: 8,
   },
   fixButton: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#000000',
+    borderColor: '#CCCCCC',
   },
   fixButtonText: {
-    color: '#000000',
+    color: '#333333',
     fontSize: 16,
     fontWeight: '600',
   },
   shareButton: {
-    backgroundColor: '#000000',
+    backgroundColor: '#333333',
     flexDirection: 'row',
   },
   shareIcon: {
@@ -420,11 +499,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   doneButton: {
-    backgroundColor: '#000000',
-    paddingVertical: 16,
+    height: 48,
+    backgroundColor: '#4CAF50',
+    justifyContent: 'center',
     alignItems: 'center',
-    margin: 16,
-    borderRadius: 8,
+    marginHorizontal: 16,
+    marginBottom: 32,
+    borderRadius: 24,
   },
   doneButtonText: {
     color: '#FFFFFF',
