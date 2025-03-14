@@ -1,101 +1,97 @@
-import React, { useState, useRef } from "react";
-import FontAwesome from "@expo/vector-icons/FontAwesome";
-import { Link, Tabs } from "expo-router";
-import { View, TouchableOpacity, StyleSheet, Platform, Animated, Text } from "react-native";
-import { router } from "expo-router";
-
-import Colors from "@/lib/constants/Colors";
+import React from "react";
+import { Ionicons } from "@expo/vector-icons";
+import { Tabs } from "expo-router";
+import { View, StyleSheet } from "react-native";
 import { useColorScheme } from "@/components/useColorScheme";
-import { useClientOnlyValue } from "@/components/useClientOnlyValue";
 
-// You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
+// Custom tab bar icon component
 function TabBarIcon(props: {
-  name: React.ComponentProps<typeof FontAwesome>["name"];
+  name: React.ComponentProps<typeof Ionicons>["name"];
   color: string;
 }) {
-  return <FontAwesome size={24} style={{ marginBottom: -3 }} {...props} />;
+  return <Ionicons size={22} {...props} />;
 }
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
-
-  const handleCameraPress = () => {
-    router.push("/camera");
+  const isDark = colorScheme === 'dark';
+  
+  // Pure black and white color scheme
+  const colors = {
+    background: isDark ? '#000000' : '#FFFFFF',
+    text: isDark ? '#FFFFFF' : '#000000',
+    border: isDark ? '#FFFFFF' : '#000000',
   };
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Tabs
         screenOptions={{
-          tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-          headerShown: false,
+          tabBarActiveTintColor: colors.text,
+          tabBarInactiveTintColor: colors.text,
           tabBarStyle: {
-            borderTopWidth: 0,
-            elevation: 0,
-            shadowOpacity: 0,
-            height: 60,
-            paddingBottom: 10,
-          }
+            backgroundColor: colors.background,
+            borderTopColor: colors.border,
+            borderTopWidth: 1,
+          },
+          tabBarLabelStyle: {
+            fontWeight: '600',
+            fontSize: 10,
+            letterSpacing: 1,
+          },
+          headerStyle: {
+            backgroundColor: colors.background,
+            borderBottomColor: colors.border,
+            borderBottomWidth: 1,
+          },
+          headerTitleStyle: {
+            color: colors.text,
+            fontWeight: '600',
+            letterSpacing: 1,
+          },
         }}
       >
         <Tabs.Screen
           name="index"
           options={{
-            title: 'Home',
-            tabBarIcon: ({ color }) => <TabBarIcon name="home" color={color} />,
+            title: 'DASHBOARD',
+            tabBarIcon: ({ color }) => <Ionicons name="home-outline" size={24} color={color} />,
           }}
         />
         <Tabs.Screen
-          name="wardrobe"
+          name="todo"
           options={{
-            title: 'Wardrobe',
-            tabBarIcon: ({ color }) => <TabBarIcon name="archive" color={color} />,
+            title: 'FOCUS',
+            tabBarIcon: ({ color }) => <Ionicons name="timer-outline" size={24} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="flashcards"
+          options={{
+            title: 'FLASHCARDS',
+            tabBarIcon: ({ color }) => <Ionicons name="card-outline" size={24} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="apps"
+          options={{
+            title: 'APPS',
+            tabBarIcon: ({ color }) => <Ionicons name="apps-outline" size={24} color={color} />,
           }}
         />
         <Tabs.Screen
           name="settings"
           options={{
-            title: 'Settings',
-            tabBarIcon: ({ color }) => <TabBarIcon name="gear" color={color} />,
+            title: 'SETTINGS',
+            tabBarIcon: ({ color }) => <Ionicons name="settings-outline" size={24} color={color} />,
           }}
         />
       </Tabs>
-
-      {/* FAB Container */}
-      <View style={styles.fabContainer} pointerEvents="box-none">
-        {/* Main FAB */}
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={handleCameraPress}
-        >
-          <TabBarIcon name="plus" color="#FFFFFF" />
-        </TouchableOpacity>
-      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  fabContainer: {
-    position: 'absolute',
-    bottom: 80,
-    right: 20,
-  },
-  fab: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#000000',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  }
+  // Additional styles if needed
 });
 

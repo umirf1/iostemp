@@ -19,7 +19,12 @@
       "infoPlist": {
         "NSCameraUsageDescription": "This app uses the camera to capture photos.",
         "NSMicrophoneUsageDescription": "This app uses the microphone for video recording.",
-        "NSPhotoLibraryUsageDescription": "This app saves photos to your photo library and allows you to select photos from your library."
+        "NSPhotoLibraryUsageDescription": "This app saves photos to your photo library and allows you to select photos from your library.",
+        "NSUserTrackingUsageDescription": "This app requires tracking permission to monitor app usage and provide delay screen functionality.",
+        "NSFamilyControlsUsageDescription": "This app requires Family Controls permission to help you manage your time on selected apps."
+      },
+      "entitlements": {
+        "com.apple.developer.family-controls": true
       }
     },
     "android": {

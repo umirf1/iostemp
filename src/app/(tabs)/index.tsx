@@ -1,9 +1,13 @@
-import React, { useRef, useEffect, useState } from "react";
-import { StyleSheet, TouchableOpacity, Image, ScrollView, View, Animated, Platform, Easing } from "react-native";
+import React, { useRef, useEffect, useState, useCallback } from "react";
+import { StyleSheet, TouchableOpacity, Image, ScrollView, View, Animated, Platform, Easing, Dimensions } from "react-native";
 import { Text } from "@/components/Themed";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useColorScheme } from '@/components/useColorScheme';
+import { Ionicons } from '@expo/vector-icons';
+import { useSettings } from '@/lib/hooks/useSettings';
+import { useFocusData } from '@/lib/hooks/useFocusData';
 
 const STEPS = [
   {
@@ -38,7 +42,24 @@ interface SampleData {
   score: number;
 }
 
-export default function HomeScreen() {
+const { width } = Dimensions.get('window');
+const CARD_WIDTH = width - 32;
+
+export default function DashboardScreen() {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const { settings } = useSettings();
+  const { todaysFocusTime, focusData } = useFocusData();
+  
+  // Pure black and white color scheme
+  const colors = {
+    background: isDark ? '#000000' : '#FFFFFF',
+    card: isDark ? '#000000' : '#FFFFFF',
+    primary: isDark ? '#FFFFFF' : '#000000',
+    text: isDark ? '#FFFFFF' : '#000000',
+    border: isDark ? '#FFFFFF' : '#000000',
+  };
+
   const params = useLocalSearchParams();
   const insets = useSafeAreaInsets();
   const [streakCount, setStreakCount] = useState<number>(3); // Default streak count
@@ -195,229 +216,380 @@ export default function HomeScreen() {
     </TouchableOpacity>
   );
 
+  // Mock data
+  const [dailyGoal, setDailyGoal] = useState(settings.dailyFocusTarget); // minutes - from settings
+  const [dailyUsage, setDailyUsage] = useState(0); // minutes
+  const [goalProgress, setGoalProgress] = useState(0);
+  
+  // Update focus data when it changes
+  useEffect(() => {
+    // Convert seconds to minutes
+    const focusMinutes = Math.floor(todaysFocusTime / 60);
+    setDailyUsage(focusMinutes);
+    setGoalProgress((focusMinutes / dailyGoal) * 100);
+  }, [todaysFocusTime, dailyGoal]);
+  
+  // Function to determine color based on percentage of goal achieved
+  const getProgressColor = (percentage: number) => {
+    if (percentage >= 100) return '#2E7D32'; // Dark green for 100%+
+    if (percentage >= 75) return '#4CAF50';  // Light green for 75-99%
+    if (percentage >= 50) return '#FFC107';  // Amber/yellow for 50-74%
+    if (percentage >= 25) return '#FF9800';  // Orange for 25-49%
+    return '#F44336';                        // Red for 0-24%
+  };
+  
+  // Generate calendar data for the last 7 days with today as the rightmost day
+  const generateCalendarData = () => {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const today = new Date();
+    const result = [];
+    
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(today.getDate() - i);
+      
+      result.push({
+        day: days[date.getDay()],
+        date: date.getDate().toString(),
+        success: true,
+        progress: Math.floor(Math.random() * 120) + 10 // Random progress for demo
+      });
+    }
+    
+    return result;
+  };
+  
+  // Calendar data (last 7 days) with progress percentages
+  const calendar = generateCalendarData();
+  
+  // Update progress values when settings change
+  useFocusEffect(
+    useCallback(() => {
+      setDailyGoal(settings.dailyFocusTarget);
+      const focusMinutes = Math.floor(todaysFocusTime / 60);
+      setDailyUsage(focusMinutes);
+      setGoalProgress((focusMinutes / settings.dailyFocusTarget) * 100);
+      
+      // Animate progress bar
+      Animated.timing(progressAnim, {
+        toValue: focusMinutes / settings.dailyFocusTarget,
+        duration: 1000,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false
+      }).start();
+    }, [settings, todaysFocusTime])
+  );
+
+  // Animation values
+  const [progressAnim] = useState(new Animated.Value(0));
+
+  // Run animations when component mounts
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: dailyUsage / dailyGoal,
+      duration: 1500,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false
+    }).start();
+  }, [dailyUsage, dailyGoal]);
+
+  // Interpolate values for animations
+  const progressWidth = progressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%']
+  });
+
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleHeaderTap} activeOpacity={0.7}>
-            <Text style={styles.greeting}>
-              Hello there!
-              {headerTapCount > 0 && headerTapCount < 5 && (
-                <Text style={styles.tapCounter}> ({5 - headerTapCount} more)</Text>
-              )}
-            </Text>
+    <ScrollView 
+      style={[styles.container, { backgroundColor: colors.background }]}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Header Section */}
+      <View style={styles.headerSection}>
+        <TouchableOpacity onPress={handleHeaderTap} activeOpacity={0.8}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            PEAK<Text style={{ fontWeight: '300', color: colors.text }}>FOCUS</Text>
+          </Text>
+          <Text style={[styles.headerSubtitle, { color: colors.text }]}>
+            Stay focused, achieve more
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Daily Focus Goal Card (renamed from Today's Progress) */}
+      <View style={[styles.card, { borderColor: colors.border }]}>
+        <View style={styles.cardHeader}>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>DAILY FOCUS GOAL</Text>
+          <TouchableOpacity 
+            style={styles.settingsButton}
+            onPress={() => router.push('/daily-goal-settings')}
+          >
+            <Ionicons name="settings-outline" size={18} color={colors.text} />
           </TouchableOpacity>
-          <Text style={styles.subtitle}>Welcome to your app template</Text>
         </View>
+        
+        <View style={styles.progressContainer}>
+          <View style={styles.progressTextContainer}>
+            <Text style={[styles.progressValue, { color: colors.text }]}>
+              {dailyUsage}<Text style={[styles.progressUnit, { color: colors.text }]}> min</Text>
+            </Text>
+            <Text style={[styles.progressGoal, { color: colors.text }]}>
+              of {dailyGoal} min focus goal
+            </Text>
+          </View>
+          
+          <View style={[styles.progressBarContainer, { borderColor: colors.border }]}>
+            <Animated.View 
+              style={[
+                styles.progressBar, 
+                { 
+                  width: progressWidth,
+                }
+              ]} 
+            />
+          </View>
+          
+          <Text style={[styles.progressRemaining, { color: colors.text }]}>
+            {dailyGoal - dailyUsage} minutes left to focus today
+          </Text>
+        </View>
+      </View>
 
-        {/* Streak section */}
+      {/* Streak Card */}
+      <View style={[styles.card, { borderColor: colors.border }]}>
+        <View style={styles.cardHeader}>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>STREAK</Text>
+        </View>
+        
         <View style={styles.streakContainer}>
-          <View style={styles.streakHeader}>
-            <Text style={styles.streakTitle}>Your Streak</Text>
-            <Text style={styles.streakCount}>{streakCount} days</Text>
+          <View style={[styles.streakCircle, { borderColor: colors.border }]}>
+            <Text style={[styles.streakValue, { color: colors.text }]}>{focusData.currentStreak}</Text>
+            <Text style={[styles.streakLabel, { color: colors.text }]}>DAYS</Text>
           </View>
           
-          <View style={styles.daysContainer}>
-            {getLastSevenDays().map((date, index) => (
-              <View key={index} style={styles.dayItem}>
-                <View 
-                  style={[
-                    styles.dayDot, 
-                    isDateInStreak(date) && styles.activeDayDot,
-                    isToday(date) && styles.todayDot
-                  ]}
-                />
-                <Text style={styles.dayLabel}>{formatDayLabel(date)}</Text>
-              </View>
-            ))}
+          <View style={styles.streakInfo}>
+            <View style={styles.streakInfoItem}>
+              <Ionicons name="trophy-outline" size={20} color={colors.text} />
+              <Text style={[styles.streakInfoText, { color: colors.text }]}>
+                Best: {focusData.longestStreak} days
+              </Text>
+            </View>
+            <View style={styles.streakInfoItem}>
+              <Ionicons name="flame-outline" size={20} color={colors.text} />
+              <Text style={[styles.streakInfoText, { color: colors.text }]}>
+                Keep it going!
+              </Text>
+            </View>
           </View>
         </View>
+      </View>
 
-        {/* Steps section */}
-        <View style={styles.stepsContainer}>
-          <Text style={styles.sectionTitle}>Get Started</Text>
-          {STEPS.map(renderStepCard)}
+      {/* Calendar Card */}
+      <View style={[styles.card, { borderColor: colors.border }]}>
+        <View style={styles.cardHeader}>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>LAST 7 DAYS</Text>
         </View>
-
-        {/* Recent items section */}
-        <View style={styles.recentContainer}>
-          <Text style={styles.sectionTitle}>Recent Items</Text>
-          
-          {sampleData.map(item => (
-            <TouchableOpacity key={item.id} style={styles.recentItem}>
-              <View style={styles.recentItemContent}>
-                <View>
-                  <Text style={styles.recentItemTitle}>{item.title}</Text>
-                  <Text style={styles.recentItemDescription}>{item.description}</Text>
-                  <Text style={styles.recentItemTime}>{getRelativeTime(item.timestamp)}</Text>
-                </View>
-                <View style={styles.scoreContainer}>
-                  <Text style={styles.scoreEmoji}>{getScoreEmoji(item.score)}</Text>
-                  <Text style={styles.scoreText}>{item.score}</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
+        
+        <View style={styles.calendarContainer}>
+          {calendar.map((day: { day: string; date: string; success: boolean; progress: number }, index: number) => (
+            <View 
+              key={index} 
+              style={styles.calendarDay}
+            >
+              <Text style={[styles.calendarDayText, { color: colors.text }]}>{day.day}</Text>
+              <View 
+                style={[
+                  styles.calendarDot, 
+                  { 
+                    backgroundColor: day.success ? getProgressColor(day.progress) : 'transparent',
+                    borderColor: colors.border,
+                    borderWidth: day.success ? 0 : 1
+                  }
+                ]} 
+              />
+              <Text style={[styles.calendarDateText, { color: colors.text }]}>{day.date}</Text>
+            </View>
           ))}
         </View>
-      </ScrollView>
-    </View>
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    padding: 16,
   },
-  scrollView: {
-    flex: 1,
+  headerSection: {
+    marginBottom: 24,
+    alignItems: 'center',
   },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 10,
-  },
-  greeting: {
+  headerTitle: {
     fontSize: 28,
-    fontWeight: "bold",
+    fontWeight: '700',
+    letterSpacing: 2,
     marginBottom: 4,
   },
-  tapCounter: {
-    fontSize: 16,
-    fontWeight: "normal",
-    color: "#999",
+  headerSubtitle: {
+    fontSize: 14,
+    fontWeight: '400',
+    letterSpacing: 1,
   },
-  subtitle: {
-    fontSize: 16,
-    color: "#666",
-  },
-  streakContainer: {
-    marginTop: 20,
-    marginHorizontal: 20,
-    backgroundColor: "#F8F8F8",
-    borderRadius: 16,
-    padding: 16,
-  },
-  streakHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  streakTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  streakCount: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#000",
-  },
-  daysContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  dayItem: {
-    alignItems: "center",
-  },
-  dayDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: "#E0E0E0",
-    marginBottom: 4,
-  },
-  activeDayDot: {
-    backgroundColor: "#000",
-  },
-  todayDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: "#000",
-  },
-  dayLabel: {
-    fontSize: 12,
-    color: "#666",
-  },
-  stepsContainer: {
-    marginTop: 24,
-    paddingHorizontal: 20,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 16,
-  },
+  // Step card styles
   stepCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F8F8F8",
-    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 16,
+    borderWidth: 1,
+    borderRadius: 8,
     marginBottom: 12,
   },
   stepIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#FFF",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
   stepTextContainer: {
     flex: 1,
   },
   stepTitle: {
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: '600',
     marginBottom: 4,
   },
   stepDescription: {
     fontSize: 14,
-    color: "#666",
+    color: '#666',
   },
-  recentContainer: {
-    marginTop: 24,
-    paddingHorizontal: 20,
-    paddingBottom: 100,
+  card: {
+    borderWidth: 1,
+    borderRadius: 0,
+    padding: 20,
+    marginBottom: 24,
   },
-  recentItem: {
-    backgroundColor: "#F8F8F8",
-    borderRadius: 16,
-    padding: 16,
+  cardHeader: {
+    marginBottom: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  cardTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  settingsButton: {
+    padding: 4,
+  },
+  progressContainer: {
+    alignItems: 'center',
+  },
+  progressTextContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  progressValue: {
+    fontSize: 48,
+    fontWeight: '700',
+  },
+  progressUnit: {
+    fontSize: 20,
+    fontWeight: '400',
+  },
+  progressGoal: {
+    fontSize: 16,
+    fontWeight: '400',
+    marginTop: 4,
+  },
+  progressBarContainer: {
+    height: 8,
+    width: '100%',
+    borderWidth: 1,
+    marginBottom: 12,
+    backgroundColor: '#F5F5F5',
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#000000',
+  },
+  progressRemaining: {
+    fontSize: 14,
+    fontWeight: '400',
+  },
+  streakContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  streakCircle: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  streakValue: {
+    fontSize: 42,
+    fontWeight: '700',
+  },
+  streakLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: 1,
+  },
+  streakInfo: {
+    flex: 1,
+    paddingLeft: 20,
+  },
+  streakInfoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 12,
   },
-  recentItemContent: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  recentItemTitle: {
+  streakInfoText: {
     fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 4,
+    fontWeight: '400',
+    marginLeft: 8,
   },
-  recentItemDescription: {
-    fontSize: 14,
-    color: "#666",
+  calendarContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  calendarDay: {
+    alignItems: 'center',
+  },
+  calendarDayText: {
+    fontSize: 12,
+    fontWeight: '600',
     marginBottom: 8,
   },
-  recentItemTime: {
+  calendarDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  calendarDateText: {
+    fontSize: 14,
+    fontWeight: '400',
+  },
+  progressTooltip: {
+    position: 'absolute',
+    top: 45,
+    padding: 6,
+    borderRadius: 4,
+    borderWidth: 1,
+    zIndex: 1,
+  },
+  progressTooltipText: {
     fontSize: 12,
-    color: "#999",
-  },
-  scoreContainer: {
-    alignItems: "center",
-  },
-  scoreEmoji: {
-    fontSize: 24,
-    marginBottom: 4,
-  },
-  scoreText: {
-    fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: '500',
   },
 });

@@ -16,6 +16,8 @@ import { Platform } from "react-native";
 import { useColorScheme } from "@/components/useColorScheme";
 import { MigrationProvider } from "@/lib/db/MigrationProvider";
 import { isOnboardingComplete, resetOnboardingStatus } from "@/lib/onboarding";
+import { SettingsProvider } from "@/lib/hooks/useSettings";
+import { FocusDataProvider } from "@/lib/hooks/useFocusData";
 
 // Conditionally import RevenueCat
 let initializePurchases: () => void;
@@ -110,78 +112,90 @@ function RootLayoutNav() {
   }
 
   return (
-    <ThemeProvider value={DefaultTheme}>
+    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
       <MigrationProvider>
-        <Stack 
-          screenOptions={{ 
-            headerShown: false,
-            contentStyle: { 
-              backgroundColor: '#fff'
-            },
-            animation: 'fade',
-          }}
-          initialRouteName={initialRoute}
-        >
-          <Stack.Screen 
-            name="onboarding" 
-            options={{ 
-              headerShown: false,
-              animation: 'fade',
-            }} 
-          />
-          <Stack.Screen 
-            name="subscription" 
-            options={{ 
-              headerShown: false,
-              animation: 'slide_from_right',
-            }} 
-          />
-          <Stack.Screen 
-            name="(tabs)" 
-            options={{ 
-              headerShown: false,
-            }} 
-          />
-          <Stack.Screen name="modal" options={{ presentation: "modal" }} />
-          <Stack.Screen
-            name="sheet"
-            options={{
-              presentation: "formSheet",
-              sheetCornerRadius: 20,
-              sheetGrabberVisible: true,
-              sheetAllowedDetents: [0.3, 1.0],
-            }}
-          />
-          <Stack.Screen 
-            name="camera" 
-            options={{ 
-              headerShown: false,
-              presentation: "fullScreenModal"
-            }} 
-          />
-          <Stack.Screen 
-            name="category-select" 
-            options={{ 
-              headerShown: false,
-              presentation: "card",
-              animation: "slide_from_right"
-            }} 
-          />
-          <Stack.Screen 
-            name="analysis" 
-            options={{ 
-              headerShown: false,
-              animation: "fade"
-            }} 
-          />
-          <Stack.Screen 
-            name="results" 
-            options={{ 
-              headerShown: false,
-              animation: "fade"
-            }} 
-          />
-        </Stack>
+        <SettingsProvider>
+          <FocusDataProvider>
+            <Stack 
+              screenOptions={{ 
+                headerShown: false,
+                contentStyle: { 
+                  backgroundColor: '#fff'
+                },
+                animation: 'fade',
+              }}
+              initialRouteName={initialRoute}
+            >
+              {initialRoute === "onboarding" ? (
+                <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
+              ) : (
+                <>
+                  <Stack.Screen 
+                    name="subscription" 
+                    options={{ 
+                      headerShown: false,
+                      animation: 'slide_from_right',
+                    }} 
+                  />
+                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                  <Stack.Screen name="modal" options={{ presentation: "modal" }} />
+                </>
+              )}
+              <Stack.Screen
+                name="sheet"
+                options={{
+                  presentation: "formSheet",
+                  sheetCornerRadius: 20,
+                  sheetGrabberVisible: true,
+                  sheetAllowedDetents: [0.3, 1.0],
+                }}
+              />
+              <Stack.Screen 
+                name="camera" 
+                options={{ 
+                  headerShown: false,
+                  presentation: "fullScreenModal"
+                }} 
+              />
+              <Stack.Screen 
+                name="category-select" 
+                options={{ 
+                  headerShown: false,
+                  presentation: "card",
+                  animation: "slide_from_right"
+                }} 
+              />
+              <Stack.Screen 
+                name="analysis" 
+                options={{ 
+                  headerShown: false,
+                  animation: "fade"
+                }} 
+              />
+              <Stack.Screen 
+                name="results" 
+                options={{ 
+                  headerShown: false,
+                  animation: "fade"
+                }} 
+              />
+              <Stack.Screen 
+                name="focus-settings" 
+                options={{ 
+                  headerShown: false,
+                  animation: "slide_from_right"
+                }} 
+              />
+              <Stack.Screen 
+                name="daily-goal-settings" 
+                options={{ 
+                  headerShown: false,
+                  animation: "slide_from_right"
+                }} 
+              />
+            </Stack>
+          </FocusDataProvider>
+        </SettingsProvider>
       </MigrationProvider>
     </ThemeProvider>
   );

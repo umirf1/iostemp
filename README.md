@@ -2,6 +2,12 @@
 
 A comprehensive React Native template for iOS apps with built-in onboarding, subscription paywall, and core app structure.
 
+## Project Documentation
+
+- [PeakFocus PRD](docs/peakfocus-prd.md) - Product Requirements Document for the PeakFocus app
+- [App Documentation](docs/app-documentation.md) - General app documentation
+- [UI Frontend Plan](docs/ui-frontend-plan.md) - UI and frontend implementation details
+
 ## Features
 
 - **Onboarding Flow**: Multi-step introduction to your app with customizable content
