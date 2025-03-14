@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -10,7 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { setOnboardingComplete } from '@/lib/onboarding';
@@ -19,32 +19,42 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const ONBOARDING_STEPS = [
   {
-    title: 'Welcome to FitcheckAI',
-    description: 'Your personal AI-powered style assistant',
-    icon: 'magic',
+    title: 'Welcome to Your App',
+    description: 'Your personalized mobile experience starts here',
+    icon: 'mobile',
   },
   {
-    title: 'Capture Your Style',
-    description: 'Take photos of your outfits and get instant AI feedback',
-    icon: 'camera',
+    title: 'Discover Features',
+    description: 'Explore all the amazing features this app has to offer',
+    icon: 'compass',
   },
   {
     title: 'Track Your Progress',
-    description: 'Build your style journey and see your improvement over time',
+    description: 'Monitor your activity and see your improvements over time',
     icon: 'line-chart',
   },
   {
-    title: 'Get Pro Features',
-    description: 'Unlock advanced style analysis, personalized recommendations, and more',
+    title: 'Premium Features',
+    description: 'Unlock advanced features, personalized recommendations, and more',
     icon: 'star',
   },
 ];
 
 export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams();
   const scrollRef = useRef<ScrollView>(null);
   const [currentStep, setCurrentStep] = useState(0);
   const scrollX = useRef(new Animated.Value(0)).current;
+  const [isRevisiting, setIsRevisiting] = useState(false);
+
+  // Check if user is revisiting onboarding from the main app
+  useEffect(() => {
+    // If we're coming from the main app, we're revisiting
+    if (router.canGoBack()) {
+      setIsRevisiting(true);
+    }
+  }, []);
 
   const handleNext = () => {
     if (currentStep < ONBOARDING_STEPS.length - 1) {
@@ -56,15 +66,32 @@ export default function OnboardingScreen() {
     } else {
       // Mark onboarding as complete
       setOnboardingComplete();
-      // Navigate to subscription screen
-      router.push('/subscription');
+      
+      // If revisiting, go back to the main app
+      if (isRevisiting) {
+        router.back();
+      } else {
+        // Otherwise, navigate to subscription screen for new users
+        router.push('/subscription');
+      }
     }
   };
 
   const handleSkip = () => {
     // Mark onboarding as complete
     setOnboardingComplete();
-    router.push('/subscription');
+    
+    // If revisiting, go back to the main app
+    if (isRevisiting) {
+      router.back();
+    } else {
+      // Otherwise, navigate to subscription screen for new users
+      router.push('/subscription');
+    }
+  };
+
+  const handleReturnToApp = () => {
+    router.back();
   };
 
   return (
@@ -78,6 +105,16 @@ export default function OnboardingScreen() {
       >
         <Text style={styles.skipText}>Skip</Text>
       </TouchableOpacity>
+
+      {/* Return to app button (only shown when revisiting) */}
+      {isRevisiting && (
+        <TouchableOpacity
+          style={[styles.returnButton, { top: insets.top + 16 }]}
+          onPress={handleReturnToApp}
+        >
+          <Text style={styles.returnText}>Return to App</Text>
+        </TouchableOpacity>
+      )}
 
       {/* Onboarding content */}
       <ScrollView
@@ -148,7 +185,9 @@ export default function OnboardingScreen() {
         onPress={handleNext}
       >
         <Text style={styles.nextButtonText}>
-          {currentStep === ONBOARDING_STEPS.length - 1 ? 'Get Started' : 'Next'}
+          {currentStep === ONBOARDING_STEPS.length - 1 
+            ? (isRevisiting ? 'Done' : 'Get Started') 
+            : 'Next'}
         </Text>
       </TouchableOpacity>
     </View>
@@ -166,6 +205,15 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   skipText: {
+    fontSize: 16,
+    color: '#666666',
+  },
+  returnButton: {
+    position: 'absolute',
+    left: 16,
+    zIndex: 1,
+  },
+  returnText: {
     fontSize: 16,
     color: '#666666',
   },

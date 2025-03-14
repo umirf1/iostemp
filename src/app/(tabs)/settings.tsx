@@ -1,206 +1,275 @@
-import { StyleSheet, ScrollView, Switch, TouchableOpacity, Platform, Alert } from "react-native";
-import { Text, View } from "@/components/Themed";
-import { useState } from "react";
-import { resetOnboardingStatus } from "@/lib/onboarding";
-import { router } from "expo-router";
+import React, { useState } from 'react';
+import { StyleSheet, View, Text, TouchableOpacity, Switch, ScrollView, Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { router } from 'expo-router';
 
 export default function SettingsScreen() {
-  const [notifications, setNotifications] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
-  
-  const handleResetOnboarding = async () => {
+  const insets = useSafeAreaInsets();
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [darkModeEnabled, setDarkModeEnabled] = useState(false);
+  const [dataCollectionEnabled, setDataCollectionEnabled] = useState(true);
+
+  const handleLogout = () => {
     Alert.alert(
-      "Reset Onboarding",
-      "Are you sure you want to reset the onboarding experience? The app will restart.",
+      'Logout',
+      'Are you sure you want to logout?',
       [
         {
-          text: "Cancel",
-          style: "cancel"
+          text: 'Cancel',
+          style: 'cancel',
         },
         {
-          text: "Reset",
-          onPress: async () => {
-            await resetOnboardingStatus();
-            // Navigate to onboarding
-            router.replace("/onboarding");
-          }
-        }
+          text: 'Logout',
+          style: 'destructive',
+          onPress: () => {
+            // In a real app, this would handle the logout process
+            console.log('User logged out');
+          },
+        },
       ]
     );
   };
-  
-  return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.header}>Settings</Text>
-      
-      {/* User Profile Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Profile</Text>
-        <View style={styles.profileInfo}>
-          <Text style={styles.label}>Name</Text>
-          <Text style={styles.value}>John Doe</Text>
-        </View>
-        <View style={styles.profileInfo}>
-          <Text style={styles.label}>Email</Text>
-          <Text style={styles.value}>john.doe@example.com</Text>
-        </View>
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to delete your account? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            // In a real app, this would handle the account deletion process
+            console.log('Account deleted');
+          },
+        },
+      ]
+    );
+  };
+
+  const renderSettingItem = (
+    icon: string,
+    title: string,
+    description: string,
+    action?: () => void,
+    toggle?: {
+      value: boolean;
+      onValueChange: (value: boolean) => void;
+    }
+  ) => (
+    <TouchableOpacity
+      style={styles.settingItem}
+      onPress={action}
+      disabled={!action}
+    >
+      <View style={styles.settingIconContainer}>
+        <FontAwesome name={icon as any} size={20} color="#000" />
       </View>
-      
-      {/* Subscription Status */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Subscription</Text>
-        <View style={styles.subscriptionCard}>
-          <Text style={styles.subscriptionTitle}>Current Balance</Text>
-          <Text style={styles.subscriptionAmount}>$0</Text>
-          <TouchableOpacity style={styles.referralButton}>
-            <Text style={styles.referralButtonText}>Refer friends to earn $</Text>
+      <View style={styles.settingContent}>
+        <Text style={styles.settingTitle}>{title}</Text>
+        <Text style={styles.settingDescription}>{description}</Text>
+      </View>
+      {toggle ? (
+        <Switch
+          value={toggle.value}
+          onValueChange={toggle.onValueChange}
+          trackColor={{ false: '#D1D1D6', true: '#000' }}
+          thumbColor="#FFFFFF"
+        />
+      ) : action ? (
+        <FontAwesome name="chevron-right" size={16} color="#999" />
+      ) : null}
+    </TouchableOpacity>
+  );
+
+  return (
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Settings</Text>
+      </View>
+
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Account</Text>
+          {renderSettingItem(
+            'user',
+            'Profile',
+            'Manage your personal information',
+            () => console.log('Navigate to profile')
+          )}
+          {renderSettingItem(
+            'credit-card',
+            'Subscription',
+            'Manage your subscription plan',
+            () => router.push('/subscription')
+          )}
+          {renderSettingItem(
+            'sign-out',
+            'Logout',
+            'Sign out of your account',
+            handleLogout
+          )}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Preferences</Text>
+          {renderSettingItem(
+            'bell',
+            'Notifications',
+            'Receive alerts and reminders',
+            undefined,
+            {
+              value: notificationsEnabled,
+              onValueChange: setNotificationsEnabled,
+            }
+          )}
+          {renderSettingItem(
+            'moon-o',
+            'Dark Mode',
+            'Switch between light and dark themes',
+            undefined,
+            {
+              value: darkModeEnabled,
+              onValueChange: setDarkModeEnabled,
+            }
+          )}
+          {renderSettingItem(
+            'database',
+            'Data Collection',
+            'Help improve the app with usage data',
+            undefined,
+            {
+              value: dataCollectionEnabled,
+              onValueChange: setDataCollectionEnabled,
+            }
+          )}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Support</Text>
+          {renderSettingItem(
+            'question-circle',
+            'Help Center',
+            'Get answers to common questions',
+            () => console.log('Navigate to help center')
+          )}
+          {renderSettingItem(
+            'envelope',
+            'Contact Us',
+            'Reach out to our support team',
+            () => console.log('Navigate to contact form')
+          )}
+          {renderSettingItem(
+            'file-text-o',
+            'Terms of Service',
+            'Read our terms and conditions',
+            () => console.log('Navigate to terms')
+          )}
+          {renderSettingItem(
+            'shield',
+            'Privacy Policy',
+            'Learn how we protect your data',
+            () => console.log('Navigate to privacy policy')
+          )}
+        </View>
+
+        <View style={styles.dangerSection}>
+          <TouchableOpacity
+            style={styles.dangerButton}
+            onPress={handleDeleteAccount}
+          >
+            <Text style={styles.dangerButtonText}>Delete Account</Text>
           </TouchableOpacity>
         </View>
-      </View>
-      
-      {/* Customization */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Customization</Text>
-        <TouchableOpacity style={styles.settingRow}>
-          <Text style={styles.settingLabel}>Personal style preferences</Text>
-          <Text style={styles.chevron}>›</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.settingRow}>
-          <Text style={styles.settingLabel}>Favorite brands</Text>
-          <Text style={styles.chevron}>›</Text>
-        </TouchableOpacity>
-      </View>
-      
-      {/* Preferences */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Preferences</Text>
-        <View style={styles.settingRow}>
-          <Text style={styles.settingLabel}>Notifications</Text>
-          <Switch
-            value={notifications}
-            onValueChange={setNotifications}
-            trackColor={{ false: "#767577", true: "#FF6B00" }}
-          />
+
+        <View style={styles.versionContainer}>
+          <Text style={styles.versionText}>Version 1.0.0</Text>
         </View>
-        <View style={styles.settingRow}>
-          <Text style={styles.settingLabel}>Dark Mode</Text>
-          <Switch
-            value={darkMode}
-            onValueChange={setDarkMode}
-            trackColor={{ false: "#767577", true: "#FF6B00" }}
-          />
-        </View>
-      </View>
-      
-      {/* Developer Options */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Developer Options</Text>
-        <TouchableOpacity 
-          style={[styles.settingRow, styles.resetButton]} 
-          onPress={handleResetOnboarding}
-        >
-          <Text style={styles.resetButtonText}>Reset Onboarding</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: '#FFFFFF',
   },
   header: {
-    fontSize: 32,
-    fontWeight: "bold",
-    marginBottom: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+  },
+  scrollView: {
+    flex: 1,
   },
   section: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 16,
     marginBottom: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: "600",
+    fontWeight: '600',
     marginBottom: 16,
+    paddingHorizontal: 20,
   },
-  profileInfo: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 12,
+  settingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    backgroundColor: '#FFFFFF',
   },
-  label: {
+  settingIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F5F5F5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  settingContent: {
+    flex: 1,
+  },
+  settingTitle: {
     fontSize: 16,
-    color: "#666",
+    fontWeight: '600',
+    marginBottom: 4,
   },
-  value: {
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  subscriptionCard: {
-    backgroundColor: "#F9F9F9",
-    borderRadius: 8,
-    padding: 16,
-    alignItems: "center",
-  },
-  subscriptionTitle: {
+  settingDescription: {
     fontSize: 14,
-    color: "#666",
-    marginBottom: 8,
+    color: '#666666',
   },
-  subscriptionAmount: {
-    fontSize: 32,
-    fontWeight: "bold",
-    marginBottom: 16,
+  dangerSection: {
+    marginTop: 24,
+    marginBottom: 40,
+    paddingHorizontal: 20,
   },
-  referralButton: {
-    backgroundColor: "#FF6B00",
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 24,
+  dangerButton: {
+    paddingVertical: 16,
+    borderRadius: 8,
+    backgroundColor: '#FFF0F0',
+    alignItems: 'center',
   },
-  referralButtonText: {
-    color: "#FFF",
-    fontWeight: "600",
-  },
-  settingRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-  },
-  settingLabel: {
+  dangerButtonText: {
     fontSize: 16,
+    fontWeight: '600',
+    color: '#FF3B30',
   },
-  chevron: {
-    fontSize: 20,
-    color: "#999",
+  versionContainer: {
+    alignItems: 'center',
+    marginBottom: 40,
   },
-  resetButton: {
-    backgroundColor: "#FF6B00",
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 24,
-    marginTop: 8,
-    width: "100%",
-    alignItems: "center",
-    borderBottomWidth: 0,
-  },
-  resetButtonText: {
-    color: "#FFF",
-    fontWeight: "600",
-    fontSize: 16,
+  versionText: {
+    fontSize: 14,
+    color: '#999999',
   },
 }); 

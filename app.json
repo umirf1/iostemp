@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "fitcheckai",
-    "slug": "fitcheckai",
+    "name": "MobileAppTemplate",
+    "slug": "mobile-app-template",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./src/assets/images/icon.png",
@@ -15,9 +15,9 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.fitcheckai.app",
+      "bundleIdentifier": "com.yourcompany.apptemplate",
       "infoPlist": {
-        "NSCameraUsageDescription": "This app uses the camera to take photos of your outfits for style analysis.",
+        "NSCameraUsageDescription": "This app uses the camera to capture photos.",
         "NSMicrophoneUsageDescription": "This app uses the microphone for video recording.",
         "NSPhotoLibraryUsageDescription": "This app saves photos to your photo library and allows you to select photos from your library."
       }
@@ -27,7 +27,7 @@
         "foregroundImage": "./src/assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.fitcheckai.app",
+      "package": "com.yourcompany.apptemplate",
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",
@@ -48,13 +48,13 @@
       [
         "expo-camera",
         {
-          "cameraPermissionText": "This app needs access to your camera to take photos of your outfits."
+          "cameraPermissionText": "This app needs access to your camera to take photos."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "This app needs access to your photos to select images for outfit analysis."
+          "photosPermission": "This app needs access to your photos to select images."
         }
       ],
       [

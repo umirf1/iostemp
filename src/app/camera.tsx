@@ -1,95 +1,66 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Image, Alert, Platform } from 'react-native';
-import { CameraView, useCameraPermissions, FlashMode, CameraType } from 'expo-camera';
-import * as ImagePicker from 'expo-image-picker';
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  StyleSheet,
+  View,
+  Text,
+  TouchableOpacity,
+  Image,
+  Alert,
+  Platform,
+} from 'react-native';
+import { CameraView, useCameraPermissions, FlashMode } from 'expo-camera';
 import { StatusBar } from 'expo-status-bar';
-import { router, useLocalSearchParams } from 'expo-router';
-import * as MediaLibrary from 'expo-media-library';
-import * as Haptics from 'expo-haptics';
-import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library';
 
 export default function CameraScreen() {
-  // Get safe area insets for proper layout
   const insets = useSafeAreaInsets();
-  
-  // Get category from route params if available
-  const { category } = useLocalSearchParams<{ category: string }>();
-  
-  // Camera state
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
-  const [mediaLibraryPermission, requestMediaLibraryPermission] = MediaLibrary.usePermissions();
-  const [isCameraReady, setIsCameraReady] = useState(false);
-  const [facing, setFacing] = useState<CameraType>('back');
+  const [facing, setFacing] = useState<'back' | 'front'>('back');
   const [flash, setFlash] = useState<FlashMode>('off');
+  const [isCameraReady, setIsCameraReady] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const cameraRef = useRef<any>(null);
 
-  // Request permissions on component mount
   useEffect(() => {
     (async () => {
-      if (!cameraPermission?.granted) {
+      if (cameraPermission && !cameraPermission.granted) {
         await requestCameraPermission();
       }
-      if (!mediaLibraryPermission?.granted) {
-        await requestMediaLibraryPermission();
-      }
     })();
-  }, [cameraPermission, mediaLibraryPermission, requestCameraPermission, requestMediaLibraryPermission]);
+  }, [cameraPermission, requestCameraPermission]);
 
-  // Handle when camera is ready
-  const onCameraReady = () => {
-    console.log('Camera is ready');
+  const handleCameraReady = () => {
     setIsCameraReady(true);
   };
 
-  // Take a picture
   const takePicture = async () => {
-    if (!cameraRef.current || !isCameraReady) return;
-    
-    try {
-      // Trigger haptic feedback
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      
-      // Capture the image
-      const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.8,
-      });
-      
-      if (photo && photo.uri) {
-        // Set the captured image
+    if (cameraRef.current && isCameraReady) {
+      try {
+        const photo = await cameraRef.current.takePictureAsync({
+          quality: 0.8,
+          skipProcessing: false,
+        });
         setCapturedImage(photo.uri);
-        
-        // Trigger success haptic feedback
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        
-        console.log('Photo taken:', photo.uri);
+      } catch (error) {
+        console.error('Error taking picture:', error);
+        Alert.alert('Error', 'Failed to take picture. Please try again.');
       }
-    } catch (error) {
-      console.error('Error taking picture:', error);
-      Alert.alert('Error', 'Failed to take picture. Please try again.');
-      
-      // Trigger error haptic feedback
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
   };
 
-  // Pick an image from the library
   const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please allow access to your photo library to select images.');
+      return;
+    }
+    
     try {
-      // Trigger haptic feedback
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      
-      // Request permission if needed
-      if (!mediaLibraryPermission?.granted) {
-        const permission = await requestMediaLibraryPermission();
-        if (!permission.granted) {
-          Alert.alert('Permission Required', 'Please grant access to your photo library to select images.');
-          return;
-        }
-      }
-      
-      // Launch image picker
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -98,125 +69,74 @@ export default function CameraScreen() {
       });
       
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        // Set the selected image
         setCapturedImage(result.assets[0].uri);
-        
-        // Trigger success haptic feedback
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        
-        console.log('Image selected:', result.assets[0].uri);
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to select image. Please try again.');
-      
-      // Trigger error haptic feedback
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
     }
   };
 
-  // Save the captured image to the device and proceed to analysis
-  const savePicture = async () => {
-    if (!capturedImage || !mediaLibraryPermission?.granted) {
-      if (!mediaLibraryPermission?.granted) {
-        const permission = await requestMediaLibraryPermission();
-        if (!permission.granted) {
-          Alert.alert('Permission Required', 'Please grant access to your photo library to save images.');
-          return;
-        }
-      }
-      return;
-    }
-    
-    try {
-      // Save the image to media library
-      const asset = await MediaLibrary.createAssetAsync(capturedImage);
-      console.log('Picture saved to library:', asset);
-      
-      // Trigger success haptic feedback
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      
-      // Log the navigation attempt
-      console.log('Navigating to home tab with captured image:', asset.uri);
-      
-      // Navigate directly to the home tab with the captured image URI
-      // First close the camera screen
-      router.back();
-      
-      // Then after a short delay, navigate to the home tab with the image
-      setTimeout(() => {
-        router.replace({
-          pathname: '/(tabs)' as any,
-          params: { capturedImage: asset.uri }
-        });
-      }, 300);
-    } catch (error) {
-      console.error('Error saving picture:', error);
-      Alert.alert('Error', 'Failed to save picture. Please try again.');
-      
-      // Trigger error haptic feedback
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    }
+  const handleFlipCamera = () => {
+    setFacing(current => (current === 'back' ? 'front' : 'back'));
   };
 
-  // Discard the captured image and return to camera
-  const retakePicture = () => {
+  const handleToggleFlash = () => {
+    setFlash(current => (current === 'off' ? 'on' : 'off'));
+  };
+
+  const handleCancel = () => {
     setCapturedImage(null);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
-  // Toggle camera type (front/back)
-  const toggleCameraType = () => {
-    setFacing(current => (
-      current === 'back' ? 'front' : 'back'
-    ));
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  const handleConfirm = async () => {
+    if (capturedImage) {
+      try {
+        // Save to media library if on device
+        if (Platform.OS !== 'web') {
+          const { status } = await MediaLibrary.requestPermissionsAsync();
+          if (status === 'granted') {
+            await MediaLibrary.saveToLibraryAsync(capturedImage);
+          }
+        }
+        
+        // Navigate back with the captured image
+        router.push({
+          pathname: '/(tabs)',
+          params: { capturedImage }
+        });
+      } catch (error) {
+        console.error('Error saving image:', error);
+        Alert.alert('Error', 'Failed to save image. Please try again.');
+      }
+    }
   };
 
-  // Toggle flash mode
-  const toggleFlash = () => {
-    setFlash(current => (
-      current === 'off' ? 'on' : 'off'
-    ));
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  };
-
-  // Close camera and go back
   const handleClose = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    console.log('Closing camera and returning to home');
-    
-    // Navigate back to the home tab without any parameters
-    router.replace({
-      pathname: '/(tabs)' as any
-    });
+    router.back();
   };
 
-  // Show loading state while checking permissions
-  if (!cameraPermission) {
+  if (cameraPermission === undefined) {
     return (
       <View style={styles.container}>
-        <StatusBar style="light" />
-        <Text style={styles.text}>Requesting camera permissions...</Text>
+        <Text style={styles.text}>Requesting camera permission...</Text>
       </View>
     );
   }
 
-  // Show error if camera permission denied
-  if (!cameraPermission.granted) {
+  if (cameraPermission && !cameraPermission.granted) {
     return (
       <View style={styles.container}>
-        <StatusBar style="light" />
-        <Text style={styles.text}>Camera access denied</Text>
-        <TouchableOpacity 
+        <Text style={styles.text}>No access to camera</Text>
+        <TouchableOpacity
           style={styles.button}
           onPress={requestCameraPermission}
         >
           <Text style={styles.buttonText}>Grant Permission</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.button, { marginTop: 10 }]}
-          onPress={handleClose}
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => router.back()}
         >
           <Text style={styles.buttonText}>Go Back</Text>
         </TouchableOpacity>
@@ -224,124 +144,85 @@ export default function CameraScreen() {
     );
   }
 
-  // Show preview if image is captured
-  if (capturedImage) {
-    return (
-      <View style={styles.container}>
-        <StatusBar style="light" />
-        
-        {/* Image preview */}
-        <Image 
-          source={{ uri: capturedImage }} 
-          style={styles.preview}
-        />
-        
-        {/* Controls overlay */}
-        <View style={[styles.controlsOverlay, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-          {/* Top bar */}
-          <View style={styles.topBar}>
-            <TouchableOpacity 
-              style={styles.iconButton}
-              onPress={retakePicture}
-            >
-              <Ionicons name="close" size={28} color="white" />
-            </TouchableOpacity>
-          </View>
-          
-          {/* Bottom bar */}
-          <View style={styles.bottomBar}>
-            <TouchableOpacity 
-              style={styles.usePhotoButton}
-              onPress={() => {
-                // First save the picture
-                savePicture();
-                
-                // Then close the camera screen
-                setTimeout(() => {
-                  handleClose();
-                }, 300);
-              }}
-            >
-              <Text style={styles.usePhotoText}>Use Photo</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    );
-  }
-
-  // Main camera view
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar style="light" />
-      
-      {/* Camera component */}
-      <CameraView
-        style={styles.camera}
-        facing={facing}
-        flash={flash}
-        ref={cameraRef}
-        onCameraReady={onCameraReady}
-      >
-        {/* Camera UI overlay */}
-        <View style={[styles.cameraOverlay, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-          {/* Top bar */}
-          <View style={styles.topBar}>
-            <TouchableOpacity 
-              style={styles.iconButton}
-              onPress={handleClose}
+
+      {capturedImage ? (
+        // Preview captured image
+        <View style={styles.previewContainer}>
+          <Image source={{ uri: capturedImage }} style={styles.previewImage} />
+          
+          <View style={styles.previewControls}>
+            <TouchableOpacity
+              style={styles.previewButton}
+              onPress={handleCancel}
             >
-              <Ionicons name="arrow-back" size={28} color="white" />
+              <FontAwesome name="times" size={24} color="#FFF" />
             </TouchableOpacity>
             
-            <TouchableOpacity 
-              style={styles.iconButton}
-              onPress={toggleFlash}
+            <TouchableOpacity
+              style={[styles.previewButton, styles.confirmButton]}
+              onPress={handleConfirm}
             >
-              <Ionicons 
-                name={flash === 'on' ? "flash" : "flash-off"} 
-                size={28} 
-                color="white" 
-              />
+              <FontAwesome name="check" size={24} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : (
+        // Camera view
+        <>
+          <CameraView
+            ref={cameraRef}
+            style={styles.camera}
+            facing={facing}
+            flash={flash}
+            onCameraReady={handleCameraReady}
+          />
+          
+          <View style={[styles.controlsContainer, { paddingBottom: insets.bottom + 20 }]}>
+            <TouchableOpacity
+              style={styles.controlButton}
+              onPress={pickImage}
+            >
+              <FontAwesome name="image" size={24} color="#FFF" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.captureButton}
+              onPress={takePicture}
+              disabled={!isCameraReady}
+            >
+              <View style={styles.captureButtonInner} />
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.controlButton}
+              onPress={handleFlipCamera}
+            >
+              <FontAwesome name="refresh" size={24} color="#FFF" />
             </TouchableOpacity>
           </View>
           
-          {/* Framing guide */}
-          <View style={styles.framingGuide}>
-            <View style={styles.cornerTL} />
-            <View style={styles.cornerTR} />
-            <View style={styles.cornerBL} />
-            <View style={styles.cornerBR} />
-          </View>
+          <TouchableOpacity
+            style={[styles.closeButton, { top: insets.top + 10 }]}
+            onPress={handleClose}
+          >
+            <FontAwesome name="chevron-left" size={24} color="#FFF" />
+          </TouchableOpacity>
           
-          {/* Bottom bar */}
-          <View style={styles.bottomBar}>
-            <View style={styles.bottomBarContent}>
-              <TouchableOpacity 
-                style={styles.iconButton}
-                onPress={pickImage}
-              >
-                <Ionicons name="images" size={28} color="white" />
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.captureButton}
-                onPress={takePicture}
-                disabled={!isCameraReady}
-              >
-                <View style={styles.captureButtonInner} />
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.iconButton}
-                onPress={toggleCameraType}
-              >
-                <Ionicons name="camera-reverse" size={28} color="white" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </CameraView>
+          <TouchableOpacity
+            style={[styles.flashButton, { top: insets.top + 10 }]}
+            onPress={handleToggleFlash}
+          >
+            <FontAwesome
+              name={flash === 'on' ? "flash" : "bolt"}
+              size={24}
+              color="#FFF"
+            />
+          </TouchableOpacity>
+        </>
+      )}
     </View>
   );
 }
@@ -355,128 +236,101 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   text: {
-    color: 'white',
+    color: '#FFF',
     fontSize: 18,
     textAlign: 'center',
-    marginTop: 100,
   },
-  cameraOverlay: {
-    flex: 1,
-    backgroundColor: 'transparent',
-    justifyContent: 'space-between',
-  },
-  controlsOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'space-between',
-  },
-  topBar: {
+  controlsContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 16,
-  },
-  bottomBar: {
-    padding: 20,
-  },
-  bottomBarContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
     alignItems: 'center',
+    paddingVertical: 20,
   },
-  iconButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+  controlButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   captureButton: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255,255,255,0.3)',
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   captureButtonInner: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: 'white',
-  },
-  preview: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-  },
-  usePhotoButton: {
-    backgroundColor: 'white',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    width: 60,
+    height: 60,
     borderRadius: 30,
-    alignSelf: 'center',
+    backgroundColor: '#FFF',
   },
-  usePhotoText: {
-    color: 'black',
-    fontSize: 16,
-    fontWeight: 'bold',
+  closeButton: {
+    position: 'absolute',
+    left: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  flashButton: {
+    position: 'absolute',
+    right: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   button: {
-    backgroundColor: 'white',
+    backgroundColor: '#FFF',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
     marginTop: 20,
-    alignSelf: 'center',
   },
   buttonText: {
-    color: 'black',
+    color: '#000',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
-  framingGuide: {
+  previewContainer: {
     flex: 1,
+    position: 'relative',
+  },
+  previewImage: {
+    flex: 1,
+    resizeMode: 'contain',
+  },
+  previewControls: {
+    position: 'absolute',
+    bottom: 40,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  cornerTL: {
-    position: 'absolute',
-    top: 60,
-    left: 40,
-    width: 30,
-    height: 30,
-    borderTopWidth: 3,
-    borderLeftWidth: 3,
-    borderColor: 'rgba(255,255,255,0.8)',
+  previewButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 20,
   },
-  cornerTR: {
-    position: 'absolute',
-    top: 60,
-    right: 40,
-    width: 30,
-    height: 30,
-    borderTopWidth: 3,
-    borderRightWidth: 3,
-    borderColor: 'rgba(255,255,255,0.8)',
-  },
-  cornerBL: {
-    position: 'absolute',
-    bottom: 60,
-    left: 40,
-    width: 30,
-    height: 30,
-    borderBottomWidth: 3,
-    borderLeftWidth: 3,
-    borderColor: 'rgba(255,255,255,0.8)',
-  },
-  cornerBR: {
-    position: 'absolute',
-    bottom: 60,
-    right: 40,
-    width: 30,
-    height: 30,
-    borderBottomWidth: 3,
-    borderRightWidth: 3,
-    borderColor: 'rgba(255,255,255,0.8)',
+  confirmButton: {
+    backgroundColor: '#4CAF50',
   },
 }); 

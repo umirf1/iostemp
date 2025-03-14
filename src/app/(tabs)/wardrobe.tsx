@@ -1,173 +1,130 @@
-import { useState } from "react";
-import { StyleSheet, FlatList, Image, TouchableOpacity, TextInput, Platform, View as RNView } from "react-native";
-import { Text, View } from "@/components/Themed";
-import FontAwesome from "@expo/vector-icons/FontAwesome";
+import React, { useState } from 'react';
+import { StyleSheet, View, Text, TouchableOpacity, ScrollView, Image } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 
-// Mock data for outfit history
-const MOCK_OUTFITS = [
-  {
-    id: "outfit1",
-    imageUri: "https://picsum.photos/300/400?random=1",
-    timestamp: "2023-06-15T14:30:00Z",
-    category: "Streetwear",
-    overallScore: 85,
-    metrics: {
-      style: 80,
-      trend: 90,
-      creativity: 85
-    }
-  },
-  {
-    id: "outfit2",
-    imageUri: "https://picsum.photos/300/400?random=2",
-    timestamp: "2023-06-14T10:15:00Z",
-    category: "Business Casual",
-    overallScore: 92,
-    metrics: {
-      style: 95,
-      trend: 88,
-      creativity: 90
-    }
-  },
-  {
-    id: "outfit3",
-    imageUri: "https://picsum.photos/300/400?random=3",
-    timestamp: "2023-06-12T18:45:00Z",
-    category: "Minimalist",
-    overallScore: 78,
-    metrics: {
-      style: 82,
-      trend: 75,
-      creativity: 70
-    }
-  }
+// Sample data for the template
+const SAMPLE_CATEGORIES = [
+  { id: '1', name: 'Category 1', count: 5 },
+  { id: '2', name: 'Category 2', count: 8 },
+  { id: '3', name: 'Category 3', count: 3 },
+  { id: '4', name: 'Category 4', count: 6 },
 ];
 
-// Sort options
-const SORT_OPTIONS = [
-  { id: "recent", label: "Recent" },
-  { id: "oldest", label: "Oldest" },
-  { id: "highest", label: "Highest Rated" }
+const SAMPLE_ITEMS = [
+  { id: '1', title: 'Item 1', category: '1', date: '2023-05-15' },
+  { id: '2', title: 'Item 2', category: '1', date: '2023-05-20' },
+  { id: '3', title: 'Item 3', category: '2', date: '2023-06-01' },
+  { id: '4', title: 'Item 4', category: '2', date: '2023-06-05' },
+  { id: '5', title: 'Item 5', category: '3', date: '2023-06-10' },
+  { id: '6', title: 'Item 6', category: '1', date: '2023-06-15' },
+  { id: '7', title: 'Item 7', category: '2', date: '2023-06-20' },
+  { id: '8', title: 'Item 8', category: '4', date: '2023-06-25' },
+  { id: '9', title: 'Item 9', category: '4', date: '2023-07-01' },
 ];
 
-export default function WardrobeScreen() {
-  const [selectedSort, setSelectedSort] = useState("recent");
-  const [outfits, setOutfits] = useState(MOCK_OUTFITS);
-  
-  // Get emoji based on score
-  const getScoreEmoji = (score: number) => {
-    if (score <= 20) return "😢";
-    if (score <= 40) return "😕";
-    if (score <= 60) return "😊";
-    if (score <= 80) return "😃";
-    return "🔥";
+export default function CollectionScreen() {
+  const insets = useSafeAreaInsets();
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Filter items based on selected category
+  const filteredItems = selectedCategory
+    ? SAMPLE_ITEMS.filter(item => item.category === selectedCategory)
+    : SAMPLE_ITEMS;
+
+  // Get category name by id
+  const getCategoryName = (categoryId: string) => {
+    const category = SAMPLE_CATEGORIES.find(cat => cat.id === categoryId);
+    return category ? category.name : 'Unknown';
   };
-  
+
   // Format date for display
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", { 
-      month: "short", 
-      day: "numeric", 
-      year: "numeric" 
-    });
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
-  
-  // Get feedback message based on score
-  const getFeedbackMessage = (score: number) => {
-    if (score <= 20) return "Tap for personalized style tips to improve";
-    if (score <= 40) return "Click to see how to level up your look";
-    if (score <= 60) return "See what makes this a good foundation";
-    if (score <= 80) return "Tap to see what makes this outfit work";
-    return "See what makes this outfit amazing";
-  };
-  
-  // Handle sorting
-  const handleSort = (sortOption: string) => {
-    setSelectedSort(sortOption);
-    
-    let sortedOutfits = [...MOCK_OUTFITS];
-    
-    switch(sortOption) {
-      case "recent":
-        sortedOutfits.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-        break;
-      case "oldest":
-        sortedOutfits.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-        break;
-      case "highest":
-        sortedOutfits.sort((a, b) => b.overallScore - a.overallScore);
-        break;
-    }
-    
-    setOutfits(sortedOutfits);
-  };
-  
-  // Render outfit card
-  const renderOutfitCard = ({ item }: { item: typeof MOCK_OUTFITS[0] }) => (
-    <TouchableOpacity style={styles.outfitCard}>
-      <Image source={{ uri: item.imageUri }} style={styles.outfitImage} />
-      <View style={styles.outfitInfo}>
-        <View style={styles.outfitHeader}>
-          <Text style={styles.outfitCategory}>{item.category}</Text>
-          <Text style={styles.outfitDate}>{formatDate(item.timestamp)}</Text>
-        </View>
-        <View style={styles.scoreContainer}>
-          <RNView style={styles.scoreLabelContainer}>
-            <Text style={styles.scoreEmoji}>{getScoreEmoji(item.overallScore)}</Text>
-            <Text style={styles.scoreLabel}>Score:</Text>
-          </RNView>
-          <RNView style={styles.scoreValueContainer}>
-            <Text style={styles.scoreValue}>{item.overallScore}</Text>
-            <Text style={styles.scoreTotal}>/100</Text>
-          </RNView>
-        </View>
-        <RNView style={styles.feedbackContainer}>
-          <Text style={styles.feedbackMessage}>{getFeedbackMessage(item.overallScore)}</Text>
-          <FontAwesome name="chevron-right" size={14} color="#666666" />
-        </RNView>
-      </View>
-    </TouchableOpacity>
-  );
-  
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Wardrobe</Text>
-      
-      {/* Sort Options */}
-      <RNView style={styles.sortContainer}>
-        <Text style={styles.sortLabel}>Sort by:</Text>
-        <RNView style={styles.sortOptions}>
-          {SORT_OPTIONS.map((option) => (
-            <TouchableOpacity
-              key={option.id}
-              style={[
-                styles.sortOption,
-                selectedSort === option.id && styles.sortOptionSelected
-              ]}
-              onPress={() => handleSort(option.id)}
-            >
-              <Text
-                style={[
-                  styles.sortOptionText,
-                  selectedSort === option.id && styles.sortOptionTextSelected
-                ]}
-              >
-                {option.label}
-              </Text>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.title}>Collection</Text>
+        <TouchableOpacity style={styles.filterButton}>
+          <FontAwesome name="sliders" size={20} color="#000" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Categories */}
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false} 
+        style={styles.categoriesContainer}
+        contentContainerStyle={styles.categoriesContent}
+      >
+        <TouchableOpacity
+          style={[
+            styles.categoryChip,
+            selectedCategory === null && styles.selectedCategoryChip
+          ]}
+          onPress={() => setSelectedCategory(null)}
+        >
+          <Text style={[
+            styles.categoryChipText,
+            selectedCategory === null && styles.selectedCategoryChipText
+          ]}>All</Text>
+        </TouchableOpacity>
+
+        {SAMPLE_CATEGORIES.map(category => (
+          <TouchableOpacity
+            key={category.id}
+            style={[
+              styles.categoryChip,
+              selectedCategory === category.id && styles.selectedCategoryChip
+            ]}
+            onPress={() => setSelectedCategory(category.id)}
+          >
+            <Text style={[
+              styles.categoryChipText,
+              selectedCategory === category.id && styles.selectedCategoryChipText
+            ]}>{category.name} ({category.count})</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {/* Items Grid */}
+      <ScrollView style={styles.itemsContainer}>
+        <View style={styles.itemsGrid}>
+          {filteredItems.map(item => (
+            <TouchableOpacity key={item.id} style={styles.itemCard}>
+              <View style={styles.itemImagePlaceholder}>
+                <FontAwesome name="image" size={24} color="#999" />
+              </View>
+              <View style={styles.itemInfo}>
+                <Text style={styles.itemTitle}>{item.title}</Text>
+                <Text style={styles.itemCategory}>{getCategoryName(item.category)}</Text>
+                <Text style={styles.itemDate}>{formatDate(item.date)}</Text>
+              </View>
             </TouchableOpacity>
           ))}
-        </RNView>
-      </RNView>
-      
-      {/* Outfit List */}
-      <FlatList
-        data={outfits}
-        renderItem={renderOutfitCard}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.outfitList}
-        showsVerticalScrollIndicator={false}
-      />
+        </View>
+
+        {/* Empty state if no items */}
+        {filteredItems.length === 0 && (
+          <View style={styles.emptyState}>
+            <FontAwesome name="folder-open-o" size={48} color="#999" />
+            <Text style={styles.emptyStateTitle}>No items found</Text>
+            <Text style={styles.emptyStateDescription}>
+              Items you add will appear here
+            </Text>
+          </View>
+        )}
+      </ScrollView>
+
+      {/* Add button */}
+      <TouchableOpacity style={[styles.addButton, { bottom: insets.bottom + 80 }]}>
+        <FontAwesome name="plus" size={24} color="#FFF" />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -175,128 +132,123 @@ export default function WardrobeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F5F5",
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    paddingHorizontal: 16,
+    backgroundColor: '#FFFFFF',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
   },
   title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    marginBottom: 20,
+    fontSize: 28,
+    fontWeight: 'bold',
   },
-  sortContainer: {
+  filterButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F5F5F5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  categoriesContainer: {
+    maxHeight: 50,
     marginBottom: 16,
-    backgroundColor: 'transparent',
   },
-  sortLabel: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 8,
-    color: '#000000',
+  categoriesContent: {
+    paddingHorizontal: 16,
   },
-  sortOptions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    backgroundColor: 'transparent',
-  },
-  sortOption: {
+  categoryChip: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#999999",
+    backgroundColor: '#F5F5F5',
+    marginRight: 8,
   },
-  sortOptionSelected: {
-    backgroundColor: "#000000",
-    borderColor: "#000000",
+  selectedCategoryChip: {
+    backgroundColor: '#000000',
   },
-  sortOptionText: {
+  categoryChipText: {
     fontSize: 14,
-    color: "#666666",
-    fontWeight: "500",
+    color: '#666666',
   },
-  sortOptionTextSelected: {
-    color: "#FFFFFF",
-    fontWeight: "600",
+  selectedCategoryChipText: {
+    color: '#FFFFFF',
   },
-  outfitList: {
-    paddingBottom: 16,
-  },
-  outfitCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    marginBottom: 16,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  outfitImage: {
-    width: "100%",
-    height: 200,
-    resizeMode: "cover",
-  },
-  outfitInfo: {
-    padding: 16,
-  },
-  outfitHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 12,
-  },
-  outfitCategory: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  outfitDate: {
-    fontSize: 14,
-    color: "#999999",
-  },
-  scoreContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
-    justifyContent: "space-between",
-  },
-  scoreLabelContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  scoreEmoji: {
-    fontSize: 20,
-    marginRight: 6,
-  },
-  scoreLabel: {
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  scoreValueContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  scoreValue: {
-    fontSize: 24,
-    fontWeight: "bold",
-  },
-  scoreTotal: {
-    fontSize: 16,
-    color: "#666666",
-    marginLeft: 1,
-  },
-  feedbackContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 8,
-    paddingRight: 4,
-  },
-  feedbackMessage: {
-    fontSize: 14,
-    color: "#666666",
+  itemsContainer: {
     flex: 1,
-    fontStyle: "italic",
+    paddingHorizontal: 16,
+  },
+  itemsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingBottom: 100,
+  },
+  itemCard: {
+    width: '48%',
+    marginBottom: 16,
+    borderRadius: 12,
+    backgroundColor: '#F8F8F8',
+    overflow: 'hidden',
+  },
+  itemImagePlaceholder: {
+    height: 150,
+    backgroundColor: '#EEEEEE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  itemInfo: {
+    padding: 12,
+  },
+  itemTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  itemCategory: {
+    fontSize: 14,
+    color: '#666666',
+    marginBottom: 4,
+  },
+  itemDate: {
+    fontSize: 12,
+    color: '#999999',
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyStateDescription: {
+    fontSize: 14,
+    color: '#666666',
+    textAlign: 'center',
+  },
+  addButton: {
+    position: 'absolute',
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
 }); 

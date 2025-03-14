@@ -21,9 +21,9 @@ const SUBSCRIPTION_PLANS = [
     price: '$9.99',
     period: 'month',
     features: [
-      'Unlimited outfit analysis',
-      'Advanced style recommendations',
-      'Personal style tracking',
+      'Unlimited access to premium features',
+      'Advanced personalization options',
+      'Progress tracking',
       'Priority support',
     ],
   },
@@ -35,7 +35,7 @@ const SUBSCRIPTION_PLANS = [
     features: [
       'All Monthly features',
       'Save 33%',
-      'Exclusive style guides',
+      'Exclusive content',
       'Early access to new features',
     ],
     popular: true,
@@ -55,7 +55,7 @@ export default function SubscriptionScreen() {
       setIsLoading(false);
       Alert.alert(
         'Demo Mode',
-        'This is a demo running in Expo Go. In a real app, this would process a payment.',
+        'This is a demo. In a real app, this would process a payment.',
         [
           { 
             text: 'Continue to App', 
@@ -79,7 +79,7 @@ export default function SubscriptionScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Choose Your Plan</Text>
         <Text style={styles.subtitle}>
-          Unlock all features and get personalized style recommendations
+          Unlock all premium features and enhance your experience
         </Text>
       </View>
 
