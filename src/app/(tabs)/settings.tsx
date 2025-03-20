@@ -185,9 +185,21 @@ export default function SettingsScreen() {
 
         {/* App Settings */}
         {renderSectionHeader('APP SETTINGS')}
+        {renderValueSetting(
+          'APP SELECTION',
+          'Choose which apps to monitor',
+          'Configure',
+          () => router.push('/app-selection')
+        )}
+        {renderValueSetting(
+          'DELAY SCREEN',
+          'Configure delay screen appearance and behavior',
+          'Configure',
+          () => router.push('/shield-settings')
+        )}
         {renderSwitchSetting(
           'DARK MODE',
-          'Toggle between light and dark theme',
+          'Use dark theme throughout the app',
           settings.darkMode,
           toggleDarkMode
         )}

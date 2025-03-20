@@ -80,6 +80,20 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
+          name="test"
+          options={{
+            title: 'TEST',
+            tabBarIcon: ({ color }) => <Ionicons name="bug-outline" size={24} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="demo"
+          options={{
+            title: 'DEMO',
+            tabBarIcon: ({ color }) => <Ionicons name="play-outline" size={24} color={color} />,
+          }}
+        />
+        <Tabs.Screen
           name="settings"
           options={{
             title: 'SETTINGS',

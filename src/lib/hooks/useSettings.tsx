@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 interface Settings {
   defaultDelayTime: number;
   enableFlashcards: boolean;
+  enableFlashcardQuiz: boolean;
   dailyBypassLimit: number;
   dailyUsageGoal: number;
   dailyFocusTarget: number;
@@ -24,6 +25,7 @@ const SettingsContext = createContext<SettingsContextType>({
   settings: {
     defaultDelayTime: 30,
     enableFlashcards: true,
+    enableFlashcardQuiz: false,
     dailyBypassLimit: 3,
     dailyUsageGoal: 120,
     dailyFocusTarget: 180,
@@ -42,6 +44,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [settings, setSettings] = useState<Settings>({
     defaultDelayTime: 30,
     enableFlashcards: true,
+    enableFlashcardQuiz: false,
     dailyBypassLimit: 3,
     dailyUsageGoal: 120,
     dailyFocusTarget: 180,

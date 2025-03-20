@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from './useColorScheme';
+import FlashcardQuiz from './FlashcardQuiz';
 
 interface DelayScreenProps {
   appName: string;
@@ -9,6 +10,7 @@ interface DelayScreenProps {
   onComplete: () => void;
   onCancel: () => void;
   showFlashcardOption?: boolean;
+  showFlashcardQuiz?: boolean;
 }
 
 // Motivational quotes to display during the delay
@@ -27,8 +29,10 @@ export default function DelayScreen({
   delayTime,
   onComplete,
   onCancel,
-  showFlashcardOption = true,
+  showFlashcardOption = false,
+  showFlashcardQuiz = false,
 }: DelayScreenProps) {
+  console.log('DelayScreen rendering with props:', { appName, delayTime, showFlashcardOption, showFlashcardQuiz });
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   
@@ -43,6 +47,7 @@ export default function DelayScreen({
   const [timeLeft, setTimeLeft] = useState(delayTime);
   const [quote, setQuote] = useState('');
   const [isActive, setIsActive] = useState(true);
+  const [showQuiz, setShowQuiz] = useState(false);
 
   // Select a random quote
   useEffect(() => {
@@ -52,7 +57,7 @@ export default function DelayScreen({
 
   // Countdown timer
   useEffect(() => {
-    if (!isActive || timeLeft <= 0) return;
+    if (!isActive || timeLeft <= 0 || showQuiz) return;
     
     const timer = setInterval(() => {
       setTimeLeft(prev => {
@@ -65,8 +70,13 @@ export default function DelayScreen({
       });
     }, 1000);
     
-    return () => clearInterval(timer);
-  }, [isActive, timeLeft, onComplete]);
+    console.log('DelayScreen timer started:', timeLeft);
+    
+    return () => {
+      console.log('DelayScreen timer cleared');
+      clearInterval(timer);
+    };
+  }, [isActive, timeLeft, onComplete, showQuiz]);
 
   // Format time as MM:SS
   const formatTime = useCallback((seconds: number) => {
@@ -78,10 +88,40 @@ export default function DelayScreen({
   // Calculate progress percentage
   const progressPercentage = ((delayTime - timeLeft) / delayTime) * 100;
 
+  // Start flashcard quiz
+  const handleStartQuiz = () => {
+    setShowQuiz(true);
+  };
+
+  // If flashcard quiz is active
+  if (showQuiz) {
+    return (
+      <FlashcardQuiz
+        onComplete={onComplete}
+        onCancel={() => setShowQuiz(false)}
+        progressPercentage={progressPercentage}
+      />
+    );
+  }
+
+  // If flashcard quiz mode is enabled, show the quiz right away
+  if (showFlashcardQuiz && !showQuiz) {
+    // Using a timeout to ensure the component is fully rendered before showing quiz
+    setTimeout(() => {
+      setShowQuiz(true);
+    }, 100);
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={onCancel} style={styles.backButton}>
+        <TouchableOpacity 
+          onPress={() => {
+            console.log('Close button pressed');
+            onCancel();
+          }} 
+          style={styles.backButton}
+        >
           <Ionicons name="close" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>DELAY SCREEN</Text>
@@ -118,14 +158,10 @@ export default function DelayScreen({
         {showFlashcardOption && (
           <TouchableOpacity 
             style={[styles.flashcardButton, { borderColor: colors.accent }]}
-            onPress={() => {
-              // Navigate to flashcard challenge
-              // This would be implemented in a real app
-              console.log('Flashcard challenge requested');
-            }}
+            onPress={handleStartQuiz}
           >
             <Text style={[styles.flashcardButtonText, { color: colors.text }]}>
-              Answer a flashcard to skip
+              Answer flashcards to skip
             </Text>
           </TouchableOpacity>
         )}
@@ -142,6 +178,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#000000', // Force black background to ensure visibility
   },
   header: {
     flexDirection: 'row',

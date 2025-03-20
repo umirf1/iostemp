@@ -24,7 +24,10 @@
         "NSFamilyControlsUsageDescription": "This app requires Family Controls permission to help you manage your time on selected apps."
       },
       "entitlements": {
-        "com.apple.developer.family-controls": true
+        "com.apple.developer.family-controls": true,
+        "com.apple.security.application-groups": [
+          "group.com.yourcompany.apptemplate"
+        ]
       }
     },
     "android": {

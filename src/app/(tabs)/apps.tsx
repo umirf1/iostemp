@@ -1,43 +1,135 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Switch, TextInput, Modal, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Switch, ActivityIndicator, Alert, ScrollView, Modal, TextInput, FlatList } from 'react-native';
 import { useColorScheme } from '@/components/useColorScheme';
 import { Ionicons } from '@expo/vector-icons';
-import { useFamilyControls } from '@/lib/hooks/useFamilyControls';
-import { AppItem, AppCategory } from '@/lib/native/FamilyControlsTypes';
-import DelayScreen from '@/components/DelayScreen';
+import { useScreenTime } from '@/lib/hooks/useScreenTime';
+import DelayScreenSelector from '@/components/DelayScreenSelector';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSettings } from '@/lib/hooks/useSettings';
+
+// Storage key for named apps
+const NAMED_APPS_KEY = 'peakfocus_named_apps';
+
+// Interface for named app
+interface NamedApp {
+  id: string;
+  name: string;
+  token: string;
+}
+
+// Array of confirmation phrases for disabling monitoring
+const DISABLE_PHRASES = [
+  "I am willing to risk losing my focus and falling back into endless scrolling",
+  "I recognize that phone addiction can steal my time and attention from what matters",
+  "I am okay with letting apps take control over my habits once again",
+  "I understand that constant distractions harm my ability to think deeply and stay present",
+  "I accept that turning this off might pull me away from my real priorities"
+];
+
+const popularApps = [
+  { name: 'Instagram', icon: 'logo-instagram' },
+  { name: 'Twitter', icon: 'logo-twitter' },
+  { name: 'TikTok', icon: 'musical-notes' },
+  { name: 'YouTube', icon: 'logo-youtube' },
+  { name: 'WhatsApp', icon: 'logo-whatsapp' },
+  { name: 'Facebook', icon: 'logo-facebook' },
+  { name: 'Netflix', icon: 'play-circle' },
+  { name: 'Snapchat', icon: 'logo-snapchat' },
+  { name: 'Reddit', icon: 'logo-reddit' },
+];
 
 export default function AppsScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   
+  // Get settings from the useSettings hook
+  const { settings, updateSettings } = useSettings();
+  
   // Pure black and white color scheme
   const colors = {
     background: isDark ? '#000000' : '#FFFFFF',
-    card: isDark ? '#000000' : '#FFFFFF',
+    card: isDark ? '#1C1C1E' : '#F2F2F7',
     primary: isDark ? '#FFFFFF' : '#000000',
     text: isDark ? '#FFFFFF' : '#000000',
     border: isDark ? '#FFFFFF' : '#000000',
     switchTrackColor: isDark ? '#333333' : '#E9E9EA',
     switchThumbColor: isDark ? '#FFFFFF' : '#FFFFFF',
+    switchTrackActiveColor: isDark ? '#555555' : '#AAAAAA',
+    caption: isDark ? '#AAAAAA' : '#777777',
+    modalBackground: isDark ? '#1C1C1E' : '#FFFFFF',
+    error: '#FF3B30',
   };
 
-  const [searchQuery, setSearchQuery] = useState('');
   const [showTestDelayScreen, setShowTestDelayScreen] = useState(false);
-  const [testAppName, setTestAppName] = useState('');
-  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+  const [showTestFlashcardScreen, setShowTestFlashcardScreen] = useState(false);
+  const [namedApps, setNamedApps] = useState<NamedApp[]>([]);
+  const [namingModalVisible, setNamingModalVisible] = useState(false);
+  const [disableModalVisible, setDisableModalVisible] = useState(false);
+  const [disablePhrase, setDisablePhrase] = useState('');
+  const [currentDisablePhrase, setCurrentDisablePhrase] = useState('');
+  const [invalidPhrase, setInvalidPhrase] = useState(false);
+  const [currentAppIndex, setCurrentAppIndex] = useState(0);
+  const [appName, setAppName] = useState('');
+  const [mockedSelectedTokens, setMockedSelectedTokens] = useState<string[]>([]);
+  // Add a local monitoring state to ensure UI consistency
+  const [localMonitoring, setLocalMonitoring] = useState<boolean>(false);
+  // Add states for app removal confirmation
+  const [removeAppModalVisible, setRemoveAppModalVisible] = useState(false);
+  const [removeAppPhrase, setRemoveAppPhrase] = useState('');
+  const [currentRemoveAppPhrase, setCurrentRemoveAppPhrase] = useState('');
+  const [invalidRemovePhrase, setInvalidRemovePhrase] = useState(false);
+  const [appToRemove, setAppToRemove] = useState<string>('');
   
-  // Use our Family Controls hook
+  // Use our ScreenTime hook
   const { 
     isAuthorized, 
     isLoading, 
     error, 
-    categories, 
     selectedApps,
+    isMonitoring,
     requestAuthorization,
-    saveSelection,
-    toggleApp,
-    toggleCategory
-  } = useFamilyControls();
+    showAppSelectionDialog,
+    startMonitoring,
+    stopMonitoring
+  } = useScreenTime();
+
+  // Sync local monitoring state with hook state
+  useEffect(() => {
+    setLocalMonitoring(isMonitoring);
+  }, [isMonitoring]);
+  
+  // Load named apps on initial render
+  useEffect(() => {
+    loadNamedApps();
+  }, []);
+
+  // Load named apps from AsyncStorage
+  const loadNamedApps = async () => {
+    try {
+      const savedAppsJson = await AsyncStorage.getItem(NAMED_APPS_KEY);
+      if (savedAppsJson) {
+        const savedApps = JSON.parse(savedAppsJson);
+        setNamedApps(savedApps);
+      }
+    } catch (err) {
+      console.error('Failed to load named apps:', err);
+    }
+  };
+
+  // Save named apps to AsyncStorage
+  const saveNamedApps = async (apps: NamedApp[]) => {
+    try {
+      await AsyncStorage.setItem(NAMED_APPS_KEY, JSON.stringify(apps));
+    } catch (err) {
+      console.error('Failed to save named apps:', err);
+    }
+  };
+
+  // Get a random disable phrase
+  const getRandomDisablePhrase = useCallback(() => {
+    const randomIndex = Math.floor(Math.random() * DISABLE_PHRASES.length);
+    return DISABLE_PHRASES[randomIndex];
+  }, []);
 
   // Request authorization on first load if not authorized
   useEffect(() => {
@@ -72,148 +164,166 @@ export default function AppsScreen() {
     }
   }, [isAuthorized, isLoading, requestAuthorization]);
 
-  // Handle toggle of category expansion
-  const toggleCategoryExpansion = useCallback((categoryId: string) => {
-    setExpandedCategories(prev => ({
-      ...prev,
-      [categoryId]: !prev[categoryId]
-    }));
+  // Handle app selection
+  const handleSelectApps = useCallback(async () => {
+    try {
+      // In a real implementation, this would call the actual ScreenTime API
+      // For now, let's simulate the selection by generating random tokens
+      
+      // First, simulate the Apple selection UI
+      Alert.alert(
+        "App Selection",
+        "This would normally show Apple's app selection UI. For testing, we'll simulate selecting 3 apps.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { 
+            text: "Select Apps", 
+            onPress: () => {
+              // Simulate receiving opaque tokens from Apple
+              const mockedTokens = [
+                `token_${Date.now()}_1`,
+                `token_${Date.now()}_2`,
+                `token_${Date.now()}_3`,
+              ];
+              
+              setMockedSelectedTokens(mockedTokens);
+              
+              // Reset the app naming process
+              setCurrentAppIndex(0);
+              setAppName('');
+              
+              // Start the app naming process
+              setNamingModalVisible(true);
+            }
+          }
+        ]
+      );
+    } catch (err) {
+      Alert.alert("Error", "Failed to show app selection dialog. Please try again.");
+      console.error("Error showing app selection dialog:", err);
+    }
   }, []);
 
-  // Handle category selection toggle
-  const handleCategoryToggle = useCallback((categoryId: string, selected: boolean) => {
-    toggleCategory(categoryId, selected);
-  }, [toggleCategory]);
-
-  // Handle app selection toggle
-  const handleAppToggle = useCallback((appId: string, selected: boolean) => {
-    toggleApp(appId, selected);
-  }, [toggleApp]);
-
-  // Save selected apps and categories
-  const handleSaveSelection = useCallback(async () => {
-    try {
-      // Extract IDs of selected categories and apps
-      const selectedCategoryIds = categories
-        .filter(cat => cat.isSelected)
-        .map(cat => cat.id);
-      
-      const selectedAppIds = categories
-        .flatMap(cat => cat.apps)
-        .filter(app => app.isControlled)
-        .map(app => app.id);
-      
-      await saveSelection(selectedCategoryIds, selectedAppIds);
-      Alert.alert("Success", "Your app selections have been saved.");
-    } catch (err) {
-      Alert.alert("Error", "Failed to save your selections. Please try again.");
-      console.error("Error saving selection:", err);
+  // Handle app naming
+  const handleNameApp = useCallback(() => {
+    if (!appName.trim()) {
+      Alert.alert("Error", "Please enter a name for this app.");
+      return;
     }
-  }, [categories, saveSelection]);
-
-  // Filter categories based on search
-  const filteredCategories = useCallback(() => {
-    if (!searchQuery.trim()) return categories;
     
-    return categories.map(category => {
-      // Filter apps within this category
-      const filteredApps = category.apps.filter(app => 
-        app.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+    // Create a new named app
+    const newNamedApp: NamedApp = {
+      id: `app_${Date.now()}_${currentAppIndex}`,
+      name: appName.trim(),
+      token: mockedSelectedTokens[currentAppIndex],
+    };
+    
+    // Add to named apps list
+    const updatedNamedApps = [...namedApps, newNamedApp];
+    setNamedApps(updatedNamedApps);
+    saveNamedApps(updatedNamedApps);
+    
+    // Clear the input
+    setAppName('');
+    
+    // Move to the next app or close modal if done
+    if (currentAppIndex < mockedSelectedTokens.length - 1) {
+      setCurrentAppIndex(currentAppIndex + 1);
+    } else {
+      setNamingModalVisible(false);
+      Alert.alert("Success", `You've added ${mockedSelectedTokens.length} apps to monitor.`);
+    }
+  }, [appName, currentAppIndex, mockedSelectedTokens, namedApps]);
+
+  // Handle removing a named app
+  const handleRemoveApp = useCallback((appId: string) => {
+    // Show phrase confirmation modal when trying to remove an app
+    const randomPhrase = getRandomDisablePhrase();
+    setCurrentRemoveAppPhrase(randomPhrase);
+    setRemoveAppPhrase('');
+    setInvalidRemovePhrase(false);
+    setAppToRemove(appId);
+    setRemoveAppModalVisible(true);
+  }, [getRandomDisablePhrase]);
+
+  // Handle remove app confirmation
+  const handleRemoveAppConfirm = useCallback(async () => {
+    if (removeAppPhrase !== currentRemoveAppPhrase) {
+      setInvalidRemovePhrase(true);
+      return;
+    }
+    
+    try {
+      const updatedApps = namedApps.filter(app => app.id !== appToRemove);
+      setNamedApps(updatedApps);
+      saveNamedApps(updatedApps);
       
-      // Only include this category if it has matching apps
-      if (filteredApps.length > 0) {
-        return {
-          ...category,
-          apps: filteredApps
-        };
-      }
-      return null;
-    }).filter(Boolean) as AppCategory[];
-  }, [categories, searchQuery]);
+      setRemoveAppModalVisible(false);
+      Alert.alert("App Removed", "The app has been removed from monitoring.");
+    } catch (err) {
+      Alert.alert("Error", "Failed to remove app. Please try again.");
+      console.error("Error removing app:", err);
+    }
+  }, [removeAppPhrase, currentRemoveAppPhrase, appToRemove, namedApps, saveNamedApps]);
 
-  // Count selected apps
-  const selectedAppCount = selectedApps.length;
-
-  // Render category with apps
-  const renderCategory = ({ item }: { item: AppCategory }) => {
-    const isExpanded = expandedCategories[item.id] || false;
-    
-    return (
-      <View style={styles.categoryContainer}>
-        {/* Category header */}
-        <TouchableOpacity 
-          style={[styles.categoryHeader, { borderBottomColor: colors.border }]}
-          onPress={() => toggleCategoryExpansion(item.id)}
-        >
-          <View style={styles.categoryTitleContainer}>
-            <View style={[styles.categoryIcon, { borderColor: colors.border }]}>
-              <Ionicons name={item.icon as any} size={20} color={colors.text} />
-            </View>
-            <Text style={[styles.categoryTitle, { color: colors.text }]}>
-              {item.name}
-            </Text>
-          </View>
-          
-          <View style={styles.categoryRightContainer}>
-            <Switch
-              value={item.isSelected}
-              onValueChange={(value) => handleCategoryToggle(item.id, value)}
-              trackColor={{ false: colors.switchTrackColor, true: isDark ? '#555555' : '#AAAAAA' }}
-              thumbColor={item.isSelected ? colors.primary : colors.switchThumbColor}
-              ios_backgroundColor={colors.switchTrackColor}
-            />
-            <Ionicons 
-              name={isExpanded ? "chevron-down" : "chevron-forward"} 
-              size={20} 
-              color={colors.text}
-              style={styles.chevron}
-            />
-          </View>
-        </TouchableOpacity>
+  // Handle monitoring toggle
+  const handleToggleMonitoring = useCallback(async (value: boolean) => {
+    try {
+      if (value) {
+        // Start monitoring
+        if (namedApps.length === 0) {
+          Alert.alert(
+            "No Apps Selected",
+            "Please select apps to monitor first.",
+            [
+              { text: "Cancel", style: "cancel" },
+              { text: "Select Apps", onPress: handleSelectApps }
+            ]
+          );
+          return;
+        }
         
-        {/* Apps within this category */}
-        {isExpanded && (
-          <View style={styles.appsContainer}>
-            {item.apps.map(app => (
-              <View 
-                key={app.id} 
-                style={[styles.appItem, { borderBottomColor: colors.border }]}
-              >
-                <View style={styles.appInfo}>
-                  <View style={[styles.appIconContainer, { borderColor: colors.border }]}>
-                    <Ionicons name={app.icon as any || "apps"} size={18} color={colors.text} />
-                  </View>
-                  <View style={styles.appDetails}>
-                    <Text style={[styles.appName, { color: colors.text }]}>{app.name}</Text>
-                    {app.isControlled && (
-                      <TouchableOpacity 
-                        onPress={() => {
-                          setTestAppName(app.name);
-                          setShowTestDelayScreen(true);
-                        }}
-                      >
-                        <Text style={[styles.appDelay, { color: colors.text }]}>
-                          30 sec delay (tap to test)
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </View>
-                <Switch
-                  value={app.isControlled}
-                  onValueChange={(value) => handleAppToggle(app.id, value)}
-                  trackColor={{ false: colors.switchTrackColor, true: isDark ? '#555555' : '#AAAAAA' }}
-                  thumbColor={app.isControlled ? colors.primary : colors.switchThumbColor}
-                  ios_backgroundColor={colors.switchTrackColor}
-                />
-              </View>
-            ))}
-          </View>
-        )}
-      </View>
-    );
-  };
+        const success = await startMonitoring();
+        
+        // Update local state first for immediate UI feedback
+        setLocalMonitoring(true);
+        
+        Alert.alert("Monitoring Started", "Selected apps will now show a delay screen when opened.");
+      } else {
+        // Show phrase confirmation modal when trying to stop monitoring
+        // Select a random phrase for this session
+        const randomPhrase = getRandomDisablePhrase();
+        setCurrentDisablePhrase(randomPhrase);
+        setDisablePhrase('');
+        setInvalidPhrase(false);
+        setDisableModalVisible(true);
+      }
+    } catch (err) {
+      Alert.alert("Error", "Failed to toggle monitoring. Please try again.");
+      console.error("Error toggling monitoring:", err);
+    }
+  }, [namedApps, startMonitoring, handleSelectApps, getRandomDisablePhrase]);
+
+  // Handle disable confirmation
+  const handleDisableConfirm = useCallback(async () => {
+    if (disablePhrase !== currentDisablePhrase) {
+      setInvalidPhrase(true);
+      return;
+    }
+    
+    try {
+      await stopMonitoring();
+      
+      // Update local state first for immediate UI feedback
+      setLocalMonitoring(false);
+      
+      setDisableModalVisible(false);
+      Alert.alert("Monitoring Stopped", "Apps will no longer show delay screens.");
+    } catch (err) {
+      Alert.alert("Error", "Failed to stop monitoring. Please try again.");
+      console.error("Error stopping monitoring:", err);
+    }
+  }, [disablePhrase, currentDisablePhrase, stopMonitoring]);
 
   // Show loading indicator
   if (isLoading) {
@@ -221,7 +331,7 @@ export default function AppsScreen() {
       <View style={[styles.centeredContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.text} />
         <Text style={[styles.loadingText, { color: colors.text }]}>
-          Loading apps...
+          Loading...
         </Text>
       </View>
     );
@@ -251,80 +361,380 @@ export default function AppsScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <Text style={[styles.headerTitle, { color: colors.text }]}>CONTROLLED APPS</Text>
+      <Text style={[styles.headerTitle, { color: colors.text }]}>APP MONITORING</Text>
       <Text style={[styles.headerSubtitle, { color: colors.text }]}>
-        Select apps to apply delay screens
+        Select apps to monitor and show delay screens
       </Text>
 
-      {/* Search Bar */}
-      <View style={[styles.searchContainer, { borderColor: colors.border }]}>
-        <Ionicons name="search-outline" size={20} color={colors.text} />
-        <TextInput
-          style={[styles.searchInput, { color: colors.text }]}
-          placeholder="Search apps..."
-          placeholderTextColor={colors.text}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
-            <Ionicons name="close-circle" size={20} color={colors.text} />
-          </TouchableOpacity>
-        )}
+      {/* App Selection Card */}
+      <View style={[styles.card, { backgroundColor: colors.card }]}>
+        <View style={styles.cardHeader}>
+          <Ionicons name="apps" size={24} color={colors.text} />
+          <Text style={[styles.cardTitle, { color: colors.text }]}>Select Apps to Monitor</Text>
+        </View>
+        
+        <Text style={[styles.cardDescription, { color: colors.caption }]}>
+          Choose which apps to monitor and show delay screens for. Due to Apple's privacy design, 
+          you'll need to provide a name for each selected app.
+        </Text>
+        
+        <TouchableOpacity 
+          style={[styles.selectButton, { backgroundColor: colors.primary }]}
+          onPress={handleSelectApps}
+        >
+          <Text style={[styles.selectButtonText, { color: colors.background }]}>
+            Select Apps
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Selected Apps Counter */}
-      <View style={styles.sectionContainer}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          ACTIVE ({selectedAppCount})
-        </Text>
-        <Text style={[styles.sectionDescription, { color: colors.text }]}>
-          These apps will show a delay screen when opened
-        </Text>
-      </View>
+      {/* Selected Apps Card */}
+      {namedApps.length > 0 && (
+        <View style={[styles.card, { backgroundColor: colors.card }]}>
+          <View style={styles.cardHeader}>
+            <Ionicons name="list" size={24} color={colors.text} />
+            <Text style={[styles.cardTitle, { color: colors.text }]}>Selected Apps</Text>
+          </View>
+          
+          <Text style={[styles.cardDescription, { color: colors.caption }]}>
+            These apps will show a delay screen when opened.
+          </Text>
+          
+          {namedApps.map((app) => (
+            <View key={app.id} style={styles.appItem}>
+              <View style={styles.appInfo}>
+                <View style={[styles.appIconContainer, { backgroundColor: colors.primary }]}>
+                  <Text style={[styles.appIconText, { color: colors.background }]}>
+                    {app.name.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                <Text style={[styles.appName, { color: colors.text }]}>{app.name}</Text>
+              </View>
+              <TouchableOpacity 
+                style={styles.removeButton}
+                onPress={() => handleRemoveApp(app.id)}
+              >
+                <Ionicons name="close-circle" size={22} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+      )}
 
-      {/* Categories List */}
-      <FlatList
-        data={filteredCategories()}
-        renderItem={renderCategory}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={[styles.emptyText, { color: colors.text }]}>
-              {searchQuery ? "No matching apps found." : "No app categories available."}
+      {/* Monitoring Toggle Card */}
+      <View style={[styles.card, { backgroundColor: colors.card }]}>
+        <View style={styles.cardHeader}>
+          <Ionicons name="eye-outline" size={24} color={colors.text} />
+          <Text style={[styles.cardTitle, { color: colors.text }]}>App Monitoring</Text>
+        </View>
+        
+        <Text style={[styles.cardDescription, { color: colors.caption }]}>
+          When enabled, selected apps will show a delay screen when opened.
+          {localMonitoring && " To disable monitoring, you'll need to type a confirmation phrase."}
+        </Text>
+        
+        <View style={styles.toggleContainer}>
+          <Text style={[styles.toggleLabel, { color: colors.text }]}>
+            Enable Monitoring
+          </Text>
+          <Switch
+            value={localMonitoring}
+            onValueChange={handleToggleMonitoring}
+            trackColor={{ false: colors.switchTrackColor, true: colors.switchTrackActiveColor }}
+            thumbColor={colors.switchThumbColor}
+            ios_backgroundColor={colors.switchTrackColor}
+          />
+        </View>
+        
+        {/* Flashcard Option Toggle (moved from How It Works section) */}
+        <View style={[styles.toggleContainer, { marginTop: 8, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border }]}>
+          <View style={{flex: 1}}>
+            <Text style={[styles.toggleLabel, { color: colors.text }]}>
+              Enable Flashcard Quiz Mode
+            </Text>
+            <Text style={[styles.toggleDescription, { color: colors.caption }]}>
+              When enabled, delay screens will show a 5-question quiz that allows immediate app access when completed
             </Text>
           </View>
-        }
-      />
+          <Switch
+            value={settings.enableFlashcardQuiz}
+            onValueChange={(value) => updateSettings({ enableFlashcardQuiz: value })}
+            trackColor={{ false: colors.switchTrackColor, true: colors.switchTrackActiveColor }}
+            thumbColor={colors.switchThumbColor}
+            ios_backgroundColor={colors.switchTrackColor}
+          />
+        </View>
+      </View>
 
-      {/* Save Button */}
-      <TouchableOpacity 
-        style={[styles.saveButton, { backgroundColor: colors.primary }]}
-        onPress={handleSaveSelection}
-      >
-        <Text style={[styles.saveButtonText, { color: colors.background }]}>
-          Save Changes
-        </Text>
-      </TouchableOpacity>
+      {/* How It Works Card */}
+      <View style={[styles.card, { backgroundColor: colors.card }]}>
+        <View style={styles.cardHeader}>
+          <Ionicons name="information-circle-outline" size={24} color={colors.text} />
+          <Text style={[styles.cardTitle, { color: colors.text }]}>How It Works</Text>
+        </View>
+        
+        <View style={styles.tutorialStep}>
+          <View style={[styles.stepNumber, { backgroundColor: colors.primary }]}>
+            <Text style={[styles.stepNumberText, { color: colors.background }]}>1</Text>
+          </View>
+          <Text style={[styles.stepText, { color: colors.text }]}>
+            Tap "Select Apps" to choose apps through Apple's selection UI
+          </Text>
+        </View>
+        
+        <View style={styles.tutorialStep}>
+          <View style={[styles.stepNumber, { backgroundColor: colors.primary }]}>
+            <Text style={[styles.stepNumberText, { color: colors.background }]}>2</Text>
+          </View>
+          <Text style={[styles.stepText, { color: colors.text }]}>
+            Name each app you selected (Apple's privacy design prevents us from knowing which apps you chose)
+          </Text>
+        </View>
+        
+        <View style={styles.tutorialStep}>
+          <View style={[styles.stepNumber, { backgroundColor: colors.primary }]}>
+            <Text style={[styles.stepNumberText, { color: colors.background }]}>3</Text>
+          </View>
+          <Text style={[styles.stepText, { color: colors.text }]}>
+            Toggle "Enable Monitoring" to activate delay screens for your selected apps
+          </Text>
+        </View>
+      </View>
 
-      {/* Test Delay Screen Modal */}
+      {/* App Naming Modal */}
       <Modal
-        visible={showTestDelayScreen}
+        visible={namingModalVisible}
         animationType="slide"
-        presentationStyle="fullScreen"
+        transparent={true}
+        onRequestClose={() => setNamingModalVisible(false)}
       >
-        <DelayScreen
-          appName={testAppName}
-          delayTime={30}
-          onComplete={() => setShowTestDelayScreen(false)}
-          onCancel={() => setShowTestDelayScreen(false)}
-        />
+        <View style={styles.modalContainer}>
+          <View style={[styles.modalContent, { backgroundColor: colors.modalBackground }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              Name This App
+            </Text>
+            
+            <Text style={[styles.modalSubtitle, { color: colors.caption }]}>
+              Due to Apple's privacy design, we can't see which app you selected.
+              Please provide a name for app {currentAppIndex + 1} of {mockedSelectedTokens.length}.
+            </Text>
+            
+            <View style={[styles.appIconLarge, { backgroundColor: colors.primary }]}>
+              <Ionicons name="apps" size={40} color={colors.background} />
+            </View>
+            
+            <Text style={[styles.modalLabel, { color: colors.text }]}>
+              What would you like to call this app?
+            </Text>
+            
+            <TextInput
+              style={[styles.modalInput, { 
+                color: colors.text,
+                borderColor: colors.border,
+                backgroundColor: isDark ? '#000000' : '#F5F5F5'
+              }]}
+              placeholder="e.g. Instagram, TikTok, etc."
+              placeholderTextColor={colors.caption}
+              value={appName}
+              onChangeText={setAppName}
+              autoFocus={true}
+              returnKeyType="done"
+              onSubmitEditing={handleNameApp}
+            />
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.modalButtonCancel, { borderColor: colors.border }]}
+                onPress={() => setNamingModalVisible(false)}
+              >
+                <Text style={[styles.modalButtonText, { color: colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.modalButtonConfirm, { backgroundColor: colors.primary }]}
+                onPress={handleNameApp}
+              >
+                <Text style={[styles.modalButtonText, { color: colors.background }]}>
+                  {currentAppIndex < mockedSelectedTokens.length - 1 ? 'Next App' : 'Finish'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
-    </View>
+
+      {/* Disable Monitoring Confirmation Modal */}
+      <Modal
+        visible={disableModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setDisableModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={[styles.modalContent, { backgroundColor: colors.modalBackground }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              Remove All Delay Screens?
+            </Text>
+            
+            <Text style={[styles.modalLabel, { color: colors.text, marginTop: 8 }]}>
+              To confirm, please type:
+            </Text>
+            
+            <Text style={[styles.disablePhrase, { color: colors.primary }]}>
+              {currentDisablePhrase}
+            </Text>
+            
+            <TextInput
+              style={[
+                styles.modalInput, 
+                { 
+                  color: colors.text,
+                  borderColor: invalidPhrase ? colors.error : colors.border,
+                  backgroundColor: isDark ? '#000000' : '#F5F5F5'
+                }
+              ]}
+              placeholder="Type the phrase exactly as shown"
+              placeholderTextColor={colors.caption}
+              value={disablePhrase}
+              onChangeText={(text) => {
+                setDisablePhrase(text);
+                setInvalidPhrase(false);
+              }}
+              autoFocus={true}
+              returnKeyType="done"
+              onSubmitEditing={handleDisableConfirm}
+            />
+            
+            {invalidPhrase && (
+              <Text style={[styles.errorText, { color: colors.error }]}>
+                The phrase doesn't match exactly. Please try again.
+              </Text>
+            )}
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.modalButtonCancel, { borderColor: colors.border }]}
+                onPress={() => setDisableModalVisible(false)}
+              >
+                <Text style={[styles.modalButtonText, { color: colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.modalButtonConfirm, { backgroundColor: colors.primary }]}
+                onPress={handleDisableConfirm}
+              >
+                <Text style={[styles.modalButtonText, { color: colors.background }]}>
+                  Disable
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Add the Remove App Confirmation Modal */}
+      <Modal
+        visible={removeAppModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setRemoveAppModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={[styles.modalContent, { backgroundColor: colors.modalBackground }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              Remove This App?
+            </Text>
+            
+            <Text style={[styles.modalLabel, { color: colors.text, marginTop: 8 }]}>
+              To confirm, please type:
+            </Text>
+            
+            <Text style={[styles.disablePhrase, { color: colors.primary }]}>
+              {currentRemoveAppPhrase}
+            </Text>
+            
+            <TextInput
+              style={[
+                styles.modalInput, 
+                { 
+                  color: colors.text,
+                  borderColor: invalidRemovePhrase ? colors.error : colors.border,
+                  backgroundColor: isDark ? '#000000' : '#F5F5F5'
+                }
+              ]}
+              placeholder="Type the phrase exactly as shown"
+              placeholderTextColor={colors.caption}
+              value={removeAppPhrase}
+              onChangeText={(text) => {
+                setRemoveAppPhrase(text);
+                setInvalidRemovePhrase(false);
+              }}
+              autoFocus={true}
+              returnKeyType="done"
+              onSubmitEditing={handleRemoveAppConfirm}
+            />
+            
+            {invalidRemovePhrase && (
+              <Text style={[styles.errorText, { color: colors.error }]}>
+                The phrase doesn't match exactly. Please try again.
+              </Text>
+            )}
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.modalButtonCancel, { borderColor: colors.border }]}
+                onPress={() => setRemoveAppModalVisible(false)}
+              >
+                <Text style={[styles.modalButtonText, { color: colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.modalButtonConfirm, { backgroundColor: colors.primary }]}
+                onPress={handleRemoveAppConfirm}
+              >
+                <Text style={[styles.modalButtonText, { color: colors.background }]}>
+                  Remove
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Test Delay Screen */}
+      {showTestDelayScreen ? (
+        <DelayScreenSelector
+          appName="App Preview"
+          delayTime={10} // Using a shorter time for testing
+          onComplete={() => {
+            console.log('Delay screen completed, hiding');
+            setShowTestDelayScreen(false);
+          }}
+          onCancel={() => {
+            console.log('Delay screen canceled, hiding');
+            setShowTestDelayScreen(false);
+          }}
+        />
+      ) : null}
+
+      {/* Test Flashcard Delay Screen */}
+      {showTestFlashcardScreen ? (
+        <DelayScreenSelector
+          appName="App Preview (Flashcard)"
+          delayTime={10} // Using a shorter time for testing
+          onComplete={() => {
+            console.log('Flashcard delay screen completed, hiding');
+            setShowTestFlashcardScreen(false);
+          }}
+          onCancel={() => {
+            console.log('Flashcard delay screen canceled, hiding');
+            setShowTestFlashcardScreen(false);
+          }}
+        />
+      ) : null}
+    </ScrollView>
   );
 }
 
@@ -352,123 +762,91 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     textAlign: 'center',
   },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    height: 44,
-    borderWidth: 1,
-    marginBottom: 24,
-  },
-  searchInput: {
-    flex: 1,
-    height: '100%',
-    marginLeft: 8,
-    fontSize: 16,
-  },
-  sectionContainer: {
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    letterSpacing: 1,
-    marginBottom: 4,
-  },
-  sectionDescription: {
-    fontSize: 14,
-    fontWeight: '400',
-  },
-  listContainer: {
-    paddingBottom: 80,
-  },
-  categoryContainer: {
-    marginBottom: 16,
-  },
-  categoryHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  categoryTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  categoryIcon: {
-    width: 36,
-    height: 36,
-    borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  categoryTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  categoryRightContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  chevron: {
-    marginLeft: 8,
-  },
-  appsContainer: {
-    paddingLeft: 16,
-  },
-  appItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  appInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  appIconContainer: {
-    width: 32,
-    height: 32,
-    borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  appDetails: {
-    justifyContent: 'center',
-  },
-  appName: {
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  appDelay: {
-    fontSize: 13,
-    marginTop: 2,
-    textDecorationLine: 'underline',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 40,
-  },
-  emptyText: {
-    fontSize: 16,
-  },
-  saveButton: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    right: 20,
+  card: {
+    borderRadius: 12,
     padding: 16,
-    borderRadius: 30,
-    alignItems: 'center',
+    marginBottom: 20,
   },
-  saveButtonText: {
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  cardDescription: {
+    fontSize: 14,
+    marginBottom: 10,
+    lineHeight: 20,
+  },
+  selectButton: {
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  selectButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusText: {
+    fontSize: 14,
+    marginLeft: 6,
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginVertical: 8,
+  },
+  toggleLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  toggleDescription: {
+    fontSize: 12,
+    lineHeight: 16,
+    marginBottom: 2,
+  },
+  tutorialStep: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  stepNumber: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  stepNumberText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  stepText: {
+    fontSize: 14,
+    flex: 1,
+  },
+  testButton: {
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    marginTop: 8,
+  },
+  testButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
   },
   loadingText: {
     marginTop: 12,
@@ -498,5 +876,119 @@ const styles = StyleSheet.create({
   permissionButtonText: {
     fontSize: 16,
     fontWeight: '600',
-  }
+  },
+  // App item styles
+  appItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(150,150,150,0.3)',
+  },
+  appInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  appIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  appIconText: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  appName: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  removeButton: {
+    padding: 4,
+  },
+  // Modal styles
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  modalContent: {
+    width: '90%',
+    maxWidth: 400,
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  appIconLarge: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+    alignSelf: 'flex-start',
+  },
+  disablePhrase: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 16,
+    textAlign: 'center',
+    alignSelf: 'center',
+  },
+  modalInput: {
+    width: '100%',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 12,
+  },
+  errorText: {
+    fontSize: 14,
+    marginBottom: 12,
+    alignSelf: 'flex-start',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    width: '100%',
+    justifyContent: 'space-between',
+    marginTop: 12,
+  },
+  modalButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  modalButtonCancel: {
+    marginRight: 8,
+    borderWidth: 1,
+  },
+  modalButtonConfirm: {
+    marginLeft: 8,
+  },
+  modalButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
 }); 

@@ -1,30 +1,34 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Switch } from 'react-native';
 import { useColorScheme } from '@/components/useColorScheme';
 import { Ionicons } from '@expo/vector-icons';
+import { FlashcardDeck } from '@/types/flashcards';
 
 // Mock data for flashcard sets
-const MOCK_FLASHCARD_SETS = [
+const MOCK_FLASHCARD_SETS: FlashcardDeck[] = [
   { 
     id: '1', 
     title: 'Productivity Tips', 
     description: 'Tips to improve your productivity',
     count: 12,
-    isDefault: true
+    isDefault: true,
+    enableForQuiz: true
   },
   { 
     id: '2', 
     title: 'General Knowledge', 
     description: 'Test your general knowledge',
     count: 20,
-    isDefault: true
+    isDefault: true,
+    enableForQuiz: true
   },
   { 
     id: '3', 
     title: 'My Custom Cards', 
     description: 'My personal flashcards',
     count: 5,
-    isDefault: false
+    isDefault: false,
+    enableForQuiz: false
   },
 ];
 
@@ -39,6 +43,9 @@ export default function FlashcardsScreen() {
     primary: isDark ? '#FFFFFF' : '#000000',
     text: isDark ? '#FFFFFF' : '#000000',
     border: isDark ? '#FFFFFF' : '#000000',
+    switchTrackColor: isDark ? '#333333' : '#E9E9EA',
+    switchThumbColor: isDark ? '#FFFFFF' : '#FFFFFF',
+    switchTrackActiveColor: isDark ? '#555555' : '#AAAAAA',
   };
 
   const [flashcardSets, setFlashcardSets] = useState(MOCK_FLASHCARD_SETS);
@@ -48,7 +55,18 @@ export default function FlashcardsScreen() {
     ? flashcardSets 
     : flashcardSets.filter(set => !set.isDefault);
 
-  const renderFlashcardSet = ({ item }: { item: typeof MOCK_FLASHCARD_SETS[0] }) => (
+  // Toggle deck quiz usage
+  const toggleDeckForQuiz = (deckId: string) => {
+    setFlashcardSets(prev => 
+      prev.map(deck => 
+        deck.id === deckId 
+          ? { ...deck, enableForQuiz: !deck.enableForQuiz } 
+          : deck
+      )
+    );
+  };
+
+  const renderFlashcardSet = ({ item }: { item: FlashcardDeck }) => (
     <TouchableOpacity 
       style={[styles.flashcardSet, { borderColor: colors.border }]}
       activeOpacity={0.7}
@@ -69,6 +87,20 @@ export default function FlashcardsScreen() {
           {item.count} cards
         </Text>
         <Ionicons name="chevron-forward" size={20} color={colors.text} />
+      </View>
+      
+      {/* Quiz toggle */}
+      <View style={styles.quizToggleContainer}>
+        <Text style={[styles.quizToggleLabel, { color: colors.text }]}>
+          Use in delay screen quizzes
+        </Text>
+        <Switch
+          value={item.enableForQuiz}
+          onValueChange={() => toggleDeckForQuiz(item.id)}
+          trackColor={{ false: colors.switchTrackColor, true: colors.switchTrackActiveColor }}
+          thumbColor={colors.switchThumbColor}
+          ios_backgroundColor={colors.switchTrackColor}
+        />
       </View>
     </TouchableOpacity>
   );
@@ -140,22 +172,6 @@ export default function FlashcardsScreen() {
       >
         <Ionicons name="add" size={24} color={isDark ? '#000000' : '#FFFFFF'} />
       </TouchableOpacity>
-
-      {/* Flashcard Usage Info */}
-      <View style={[styles.infoCard, { borderColor: colors.border }]}>
-        <View style={styles.infoHeader}>
-          <Ionicons name="information-circle-outline" size={22} color={colors.text} />
-          <Text style={[styles.infoTitle, { color: colors.text }]}>FLASHCARD BYPASS</Text>
-        </View>
-        <Text style={[styles.infoText, { color: colors.text }]}>
-          Answer flashcard questions correctly to bypass the delay screen when opening controlled apps.
-        </Text>
-        <View style={[styles.bypassCounter, { borderColor: colors.border, borderWidth: 1 }]}>
-          <Text style={[styles.bypassCounterText, { color: colors.text }]}>
-            3 BYPASSES REMAINING TODAY
-          </Text>
-        </View>
-      </View>
     </View>
   );
 }
@@ -235,6 +251,19 @@ const styles = StyleSheet.create({
   flashcardCount: {
     fontSize: 14,
   },
+  quizToggleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 0.5,
+    borderTopColor: 'rgba(150,150,150,0.3)',
+  },
+  quizToggleLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -246,44 +275,16 @@ const styles = StyleSheet.create({
   addButton: {
     position: 'absolute',
     right: 16,
-    bottom: 100,
+    bottom: 20,
     width: 48,
     height: 48,
-    borderRadius: 0,
-    borderWidth: 1,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  infoCard: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: 16,
-    borderWidth: 1,
-    padding: 20,
-  },
-  infoHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  infoTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    letterSpacing: 1,
-    marginLeft: 8,
-  },
-  infoText: {
-    fontSize: 14,
-    marginBottom: 16,
-  },
-  bypassCounter: {
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  bypassCounterText: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
 }); 
