@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Switch } from 'reac
 import { useColorScheme } from '@/components/useColorScheme';
 import { Ionicons } from '@expo/vector-icons';
 import { FlashcardDeck } from '@/types/flashcards';
+import { router } from 'expo-router';
 
 // Mock data for flashcard sets
 const MOCK_FLASHCARD_SETS: FlashcardDeck[] = [
@@ -66,10 +67,33 @@ export default function FlashcardsScreen() {
     );
   };
 
+  // Navigate to deck detail screen
+  const navigateToDeckDetail = (deckId: string) => {
+    router.push(`/deck/${deckId}`);
+  };
+
+  // Create a new flashcard deck
+  const createNewDeck = () => {
+    const newDeck: FlashcardDeck = {
+      id: Date.now().toString(),
+      title: 'New Flashcard Deck',
+      description: 'Add a description here',
+      count: 0,
+      isDefault: false,
+      enableForQuiz: false
+    };
+    
+    setFlashcardSets(prev => [...prev, newDeck]);
+    
+    // Navigate to the new deck
+    router.push(`/deck/${newDeck.id}`);
+  };
+
   const renderFlashcardSet = ({ item }: { item: FlashcardDeck }) => (
     <TouchableOpacity 
       style={[styles.flashcardSet, { borderColor: colors.border }]}
       activeOpacity={0.7}
+      onPress={() => navigateToDeckDetail(item.id)}
     >
       <View style={styles.flashcardSetHeader}>
         <Text style={[styles.flashcardSetTitle, { color: colors.text }]}>{item.title}</Text>
@@ -79,9 +103,7 @@ export default function FlashcardsScreen() {
           </View>
         )}
       </View>
-      <Text style={[styles.flashcardSetDescription, { color: colors.text }]}>
-        {item.description}
-      </Text>
+      <Text style={[styles.flashcardSetDescription, { color: colors.text }]}>{item.description}</Text>
       <View style={styles.flashcardSetFooter}>
         <Text style={[styles.flashcardCount, { color: colors.text }]}>
           {item.count} cards
@@ -169,6 +191,7 @@ export default function FlashcardsScreen() {
       <TouchableOpacity 
         style={[styles.addButton, { backgroundColor: colors.primary, borderColor: colors.border }]}
         activeOpacity={0.8}
+        onPress={createNewDeck}
       >
         <Ionicons name="add" size={24} color={isDark ? '#000000' : '#FFFFFF'} />
       </TouchableOpacity>

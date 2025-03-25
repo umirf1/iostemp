@@ -193,6 +193,14 @@ function RootLayoutNav() {
                   animation: "slide_from_right"
                 }} 
               />
+              <Stack.Screen 
+                name="deck/[id]" 
+                options={{ 
+                  headerShown: true,
+                  headerBackTitle: 'Flashcards',
+                  animation: "slide_from_right"
+                }} 
+              />
             </Stack>
           </FocusDataProvider>
         </SettingsProvider>
